@@ -27,6 +27,7 @@ import {
   CheckCircle2,
   Layers,
   Calendar,
+  X,
 } from 'lucide-react-native';
 import { useBirthdays } from '../context/BirthdayContext';
 import { SavedSource, SourcesService } from '../services/sources';
@@ -246,13 +247,37 @@ export const SavedSourcesModal: React.FC<SavedSourcesModalProps> = ({
             <View style={[styles.grabber, { backgroundColor: isDark ? '#3A3A3C' : '#D1D1D6' }]} />
           </View>
 
-          {/* Navigation Bar */}
-          <View style={styles.navHeader} {...panResponder.panHandlers}>
-            <View style={styles.navSpacer} />
-            <Text style={[styles.navTitle, { color: colors.textPrimary }]}>Saved Sources & Links</Text>
-            <TouchableOpacity activeOpacity={0.7} onPress={onClose} style={styles.doneBtn}>
-              <Text style={[styles.doneText, { color: colors.accent }]}>Done</Text>
-            </TouchableOpacity>
+          {/* Authentic Apple Navigation Bar */}
+          <View
+            style={[
+              styles.navHeader,
+              { borderBottomColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' },
+            ]}
+            {...panResponder.panHandlers}
+          >
+            <View style={styles.navSideSlot} />
+
+            <Text style={[styles.navCenterTitle, { color: colors.textPrimary }]}>
+              Saved Sources
+            </Text>
+
+            <View style={styles.navSideSlot}>
+              <TouchableOpacity
+                activeOpacity={0.7}
+                onPress={() => {
+                  try {
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  } catch (e) {}
+                  onClose();
+                }}
+                style={[
+                  styles.closeCircleBtn,
+                  { backgroundColor: isDark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.06)' },
+                ]}
+              >
+                <X size={15} color={colors.textSecondary} />
+              </TouchableOpacity>
+            </View>
           </View>
 
           <ScrollView style={styles.body} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
@@ -465,26 +490,26 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingVertical: 10,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: 'rgba(120, 120, 128, 0.2)',
   },
-  navSpacer: {
-    width: 50,
-  },
-  navTitle: {
-    fontSize: 17,
-    fontWeight: '600',
-    letterSpacing: -0.4,
-  },
-  doneBtn: {
-    width: 50,
+  navSideSlot: {
+    width: 36,
     alignItems: 'flex-end',
+    justifyContent: 'center',
   },
-  doneText: {
+  navCenterTitle: {
     fontSize: 17,
     fontWeight: '600',
     letterSpacing: -0.4,
+    textAlign: 'center',
+  },
+  closeCircleBtn: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   body: {
     flex: 1,

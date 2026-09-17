@@ -22,7 +22,8 @@ import {
   ChevronRight,
   ExternalLink,
   Zap,
-  ArrowUpCircle,
+  X,
+  Heart,
 } from 'lucide-react-native';
 import { useBirthdays } from '../context/BirthdayContext';
 import { AppLogo } from './AppLogo';
@@ -58,7 +59,7 @@ export const AboutModal: React.FC<AboutModalProps> = ({ visible, onClose }) => {
           Animated.spring(panY, {
             toValue: 0,
             bounciness: 4,
-            useNativeDriver: true,
+            useNativeDriver: Platform.OS !== 'web',
           }).start();
         }
       },
@@ -96,10 +97,9 @@ export const AboutModal: React.FC<AboutModalProps> = ({ visible, onClose }) => {
     } catch (e) { }
   };
 
-  // Apple iOS HIG color tokens
-  const screenBg = isDark ? '#000000' : '#F2F2F7';
-  const cardBg = isDark ? '#1C1C1E' : '#FFFFFF';
-  const borderColor = isDark ? '#2C2C2E' : '#E5E5EA';
+  const screenBg = isDark ? '#1C1C1E' : '#F2F2F7';
+  const cardBg = isDark ? '#2C2C2E' : '#FFFFFF';
+  const borderColor = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)';
 
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
@@ -123,17 +123,45 @@ export const AboutModal: React.FC<AboutModalProps> = ({ visible, onClose }) => {
             <View style={[styles.grabber, { backgroundColor: isDark ? '#3A3A3C' : '#D1D1D6' }]} />
           </View>
 
-          {/* Standard Apple iOS Navigation Bar */}
-          <View style={styles.navHeader} {...panResponder.panHandlers}>
-            <View style={styles.navSpacer} />
-            <Text style={[styles.navTitle, { color: colors.textPrimary }]}>About</Text>
-            <TouchableOpacity activeOpacity={0.7} onPress={onClose} style={styles.doneBtn}>
-              <Text style={[styles.doneText, { color: colors.accent }]}>Done</Text>
-            </TouchableOpacity>
+          {/* Authentic Apple Navigation Bar */}
+          <View
+            style={[
+              styles.navHeader,
+              { borderBottomColor: borderColor },
+            ]}
+            {...panResponder.panHandlers}
+          >
+            <View style={styles.navSideSlot} />
+
+            <Text style={[styles.navCenterTitle, { color: colors.textPrimary }]}>
+              About Dinank
+            </Text>
+
+            <View style={styles.navSideSlot}>
+              <TouchableOpacity
+                activeOpacity={0.7}
+                onPress={() => {
+                  try {
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  } catch (e) { }
+                  onClose();
+                }}
+                style={[
+                  styles.closeCircleBtn,
+                  { backgroundColor: isDark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.06)' },
+                ]}
+              >
+                <X size={15} color={colors.textSecondary} />
+              </TouchableOpacity>
+            </View>
           </View>
 
-          <ScrollView style={styles.body} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-            {/* App Hero Branding Card */}
+          <ScrollView
+            style={styles.body}
+            contentContainerStyle={styles.scrollContent}
+            showsVerticalScrollIndicator={false}
+          >
+            {/* App Hero Branding Card with Glowing Halo */}
             <View
               style={[
                 styles.heroCard,
@@ -144,19 +172,22 @@ export const AboutModal: React.FC<AboutModalProps> = ({ visible, onClose }) => {
                 style={[
                   styles.logoWrapper,
                   {
-                    backgroundColor: isDark ? '#1C2433' : '#F0F6FF',
-                    borderColor: isDark ? '#2D3B55' : '#DCE8FA',
+                    backgroundColor: colors.accent,
+                    ...Platform.select({
+                      web: { boxShadow: `0 8px 24px ${colors.accent}45` },
+                      default: { elevation: 6 },
+                    }),
                   },
                 ]}
               >
                 <AppLogo
-                  size={52}
-                  color={colors.accent}
-                  eyeColor={isDark ? '#1C2433' : '#FFFFFF'}
+                  size={50}
+                  color="#FFFFFF"
+                  eyeColor={colors.accent}
                 />
               </View>
 
-              <Text style={[styles.appName, { color: colors.textPrimary }]}>Dinank</Text>
+              <Text style={[styles.appName, { color: colors.textPrimary }]}>दिनांक वृंदा</Text>
               <Text style={[styles.appTagline, { color: colors.textSecondary }]}>
                 Smart Birthday & Student Reminder Manager
               </Text>
@@ -340,6 +371,16 @@ export const AboutModal: React.FC<AboutModalProps> = ({ visible, onClose }) => {
               </View>
             </View>
 
+            <View style={styles.footerNote}>
+              <Heart size={13} color="#FF2D55" fill="#FF2D55" style={{ marginRight: 6 }} />
+              <Text style={[styles.footerText, { color: colors.textSecondary }]}>
+                <Text style={[styles.hindiBrand, { color: colors.textPrimary }]}>
+                  वृन्दोपनिषद्
+                </Text>
+                {'  •  प्रेम, स्नेह और आत्मीयता का उत्सव'}
+              </Text>
+            </View>
+
             <View style={{ height: 36 }} />
           </ScrollView>
         </Animated.View>
@@ -355,9 +396,10 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   sheet: {
-    borderTopLeftRadius: 18,
-    borderTopRightRadius: 18,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
     height: '88%',
+    overflow: 'hidden',
   },
   grabberWrapper: {
     alignItems: 'center',
@@ -374,63 +416,64 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingVertical: 10,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: 'rgba(120, 120, 128, 0.2)',
   },
-  navSpacer: {
-    width: 50,
-  },
-  navTitle: {
-    fontSize: 17,
-    fontWeight: '600',
-    letterSpacing: -0.4,
-  },
-  doneBtn: {
-    width: 50,
+  navSideSlot: {
+    width: 36,
     alignItems: 'flex-end',
+    justifyContent: 'center',
   },
-  doneText: {
+  navCenterTitle: {
     fontSize: 17,
     fontWeight: '600',
     letterSpacing: -0.4,
+    textAlign: 'center',
+  },
+  closeCircleBtn: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   body: {
     flex: 1,
   },
   scrollContent: {
     paddingHorizontal: 16,
-    paddingTop: 8,
+    paddingTop: 12,
     paddingBottom: 24,
   },
   heroCard: {
     alignItems: 'center',
-    paddingVertical: 20,
+    paddingVertical: 22,
     paddingHorizontal: 16,
-    borderRadius: 14,
+    borderRadius: 16,
     borderWidth: StyleSheet.hairlineWidth,
     marginTop: 4,
-    marginBottom: 6,
+    marginBottom: 14,
   },
   logoWrapper: {
-    width: 74,
-    height: 74,
-    borderRadius: 18,
+    width: 76,
+    height: 76,
+    borderRadius: 38,
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 1,
     marginBottom: 12,
   },
   appName: {
-    fontSize: 22,
+    fontSize: 24,
     fontWeight: '700',
-    letterSpacing: -0.5,
-    marginBottom: 3,
+    fontFamily: Platform.select({ web: 'Laila, serif', default: undefined }),
+    letterSpacing: 0.2,
+    marginBottom: 4,
   },
   appTagline: {
     fontSize: 13,
     textAlign: 'center',
-    marginBottom: 10,
+    marginBottom: 12,
+    lineHeight: 18,
   },
   versionBadge: {
     paddingHorizontal: 12,
@@ -442,15 +485,15 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   sectionHeader: {
-    fontSize: 12,
-    fontWeight: '500',
+    fontSize: 11,
+    fontWeight: '600',
     letterSpacing: 0.5,
     marginBottom: 6,
     paddingHorizontal: 4,
     textTransform: 'uppercase',
   },
   groupedCard: {
-    borderRadius: 12,
+    borderRadius: 14,
     borderWidth: StyleSheet.hairlineWidth,
     overflow: 'hidden',
   },
@@ -544,5 +587,30 @@ const styles = StyleSheet.create({
     fontSize: 12,
     marginTop: 1,
     lineHeight: 16,
+  },
+  footerNote: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 22,
+    paddingHorizontal: 16,
+  },
+  hindiBrand: {
+    fontFamily: Platform.select({
+      web: 'Laila, Kalam, "Noto Serif Devanagari", serif',
+      default: undefined,
+    }),
+    fontWeight: '700',
+    fontSize: 13.5,
+  },
+  footerText: {
+    fontFamily: Platform.select({
+      web: 'Laila, Kalam, "Noto Serif Devanagari", serif',
+      default: undefined,
+    }),
+    fontSize: 13,
+    fontWeight: '500',
+    letterSpacing: 0.1,
+    textAlign: 'center',
   },
 });

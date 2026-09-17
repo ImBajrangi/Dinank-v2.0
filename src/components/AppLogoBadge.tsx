@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet, Platform } from 'react-native';
 import Svg, { Path, Rect, Defs, LinearGradient, Stop, Circle } from 'react-native-svg';
 
 interface AppLogoBadgeProps {
@@ -95,11 +95,18 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   iconContainer: {
-    shadowColor: '#FF2D55',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.35,
-    shadowRadius: 8,
-    elevation: 6,
+    ...Platform.select({
+      web: {
+        boxShadow: '0 4px 8px rgba(255, 45, 85, 0.35)',
+      },
+      default: {
+        shadowColor: '#FF2D55',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.35,
+        shadowRadius: 8,
+        elevation: 6,
+      },
+    }),
   },
   textCol: {
     marginLeft: 12,

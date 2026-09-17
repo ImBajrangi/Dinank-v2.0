@@ -723,6 +723,9 @@ const styles = StyleSheet.create({
     height: 44,
     fontSize: 17,
     letterSpacing: -0.3,
+    ...Platform.select({
+      web: { outlineStyle: 'none' } as any,
+    }),
   },
   scrollRow: {
     padding: 10,
@@ -762,6 +765,9 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     fontSize: 15,
     fontWeight: '600',
+    ...Platform.select({
+      web: { outlineStyle: 'none' } as any,
+    }),
   },
   relScrollRow: {
     flexDirection: 'row',
@@ -796,5 +802,8 @@ const styles = StyleSheet.create({
     letterSpacing: -0.3,
     minHeight: 70,
     textAlignVertical: 'top',
+    ...Platform.select({
+      web: { outlineStyle: 'none' } as any,
+    }),
   },
 });

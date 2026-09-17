@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Platform } from 'react-native';
 import { Plus } from 'lucide-react-native';
 import { useBirthdays } from '../context/BirthdayContext';
 import { AppLogo } from './AppLogo';
@@ -27,12 +27,10 @@ export const EmptyState: React.FC<EmptyStateProps> = React.memo(({
           {
             backgroundColor: isDark ? colors.surface : colors.surfaceSubtle,
             borderWidth: 1,
-            borderColor: isDark ? colors.surfaceBorder : colors.cardBorder,
-            shadowColor: colors.accent,
-            shadowOffset: { width: 0, height: 4 },
-            shadowOpacity: isDark ? 0.25 : 0.1,
-            shadowRadius: 12,
-            elevation: 4,
+            ...Platform.select({
+              web: { boxShadow: `0 4px 16px ${colors.accent}30` },
+              default: { elevation: 4 },
+            }),
           },
         ]}
       >

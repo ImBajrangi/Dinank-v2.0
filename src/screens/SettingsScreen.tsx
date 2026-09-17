@@ -14,11 +14,9 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
+import Svg, { Path, Circle } from 'react-native-svg';
 import {
   Bell,
-  Moon,
-  Sun,
-  Smartphone,
   ShieldCheck,
   Download,
   Database,
@@ -36,12 +34,49 @@ import {
   Globe,
   ArrowUpCircle,
 } from 'lucide-react-native';
+
+// Authentic Apple HIG Theme Icons
+const AppleMoonIcon: React.FC<{ size?: number; color: string; style?: any }> = ({ size = 18, color, style }) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" style={style}>
+    <Path
+      d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"
+      fill={color}
+      stroke={color}
+      strokeWidth={1.5}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  </Svg>
+);
+
+const AppleSunIcon: React.FC<{ size?: number; color: string; style?: any }> = ({ size = 18, color, style }) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" style={style}>
+    <Circle cx="12" cy="12" r="4.5" fill={color} />
+    <Path
+      d="M12 2v2.5M12 19.5V22M4.93 4.93l1.77 1.77M17.3 17.3l1.77 1.77M2 12h2.5M19.5 12H22M4.93 19.07l1.77-1.77M17.3 6.7l1.77-1.77"
+      stroke={color}
+      strokeWidth={2}
+      strokeLinecap="round"
+    />
+  </Svg>
+);
+
+const AppleAutoIcon: React.FC<{ size?: number; color: string; style?: any }> = ({ size = 18, color, style }) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" style={style}>
+    <Circle cx="12" cy="12" r="8.5" stroke={color} strokeWidth={1.8} />
+    <Path
+      d="M12 3.5a8.5 8.5 0 0 0 0 17v-17z"
+      fill={color}
+    />
+  </Svg>
+);
 import { useBirthdays } from '../context/BirthdayContext';
 import { NotificationService } from '../services/notifications';
 import { AppleSwitch } from '../components/AppleSwitch';
 import { ImporterService } from '../services/importer';
 import { ImportModal } from '../components/ImportModal';
 import { PersonalizationModal } from '../components/PersonalizationModal';
+import { EditProfileModal } from '../components/EditProfileModal';
 import { ClockTimePickerModal } from '../components/ClockTimePickerModal';
 import { AboutModal } from '../components/AboutModal';
 import { SoundPickerModal } from '../components/SoundPickerModal';
@@ -78,6 +113,7 @@ export const SettingsScreen: React.FC = () => {
   const [isSavedSourcesOpen, setIsSavedSourcesOpen] = useState(false);
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
   const [isPersonalizationOpen, setIsPersonalizationOpen] = useState(false);
+  const [isEditProfileOpen, setIsEditProfileOpen] = useState(false);
   const [isClockPickerOpen, setIsClockPickerOpen] = useState(false);
   const [isAboutModalOpen, setIsAboutModalOpen] = useState(false);
   const [isSoundPickerOpen, setIsSoundPickerOpen] = useState(false);
@@ -235,7 +271,7 @@ export const SettingsScreen: React.FC = () => {
             try {
               Haptics.selectionAsync();
             } catch (e) {}
-            setIsPersonalizationOpen(true);
+            setIsEditProfileOpen(true);
           }}
           style={[styles.profileCard, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}
         >
@@ -247,21 +283,32 @@ export const SettingsScreen: React.FC = () => {
               backgroundColor: colors.accent,
               alignItems: 'center',
               justifyContent: 'center',
-              shadowColor: colors.accent,
-              shadowOffset: { width: 0, height: 2 },
-              shadowOpacity: isDark ? 0.35 : 0.15,
-              shadowRadius: 6,
-              elevation: 3,
+              ...Platform.select({
+                web: { boxShadow: `0 2px 8px ${colors.accent}40` },
+                default: { elevation: 3 },
+              }),
             }}
           >
-            <AppLogo size={30} color="#FFFFFF" eyeColor={colors.accent} />
+            {settings.senderName?.trim() ? (
+              <Text style={{ color: '#FFFFFF', fontSize: 18, fontWeight: '700' }}>
+                {settings.senderName
+                  .trim()
+                  .split(' ')
+                  .slice(0, 2)
+                  .map((n) => n[0])
+                  .join('')
+                  .toUpperCase()}
+              </Text>
+            ) : (
+              <AppLogo size={30} color="#FFFFFF" eyeColor={colors.accent} />
+            )}
           </View>
           <View style={styles.profileInfo}>
             <Text style={[styles.profileName, { color: colors.textPrimary }]}>
               {settings.senderName || 'Set Your Name'}
             </Text>
             <Text style={[styles.profileSub, { color: colors.textSecondary }]}>
-              Dinank Profile • Custom Wishes & Sender ID
+              {settings.senderName ? 'Sender Profile & Signature' : 'Tap to set your sender name & title'}
             </Text>
           </View>
           <ChevronRight size={18} color={colors.textMuted} />
@@ -549,47 +596,75 @@ export const SettingsScreen: React.FC = () => {
         <Text style={[styles.sectionHeader, { color: colors.textSecondary }]}>
           APPEARANCE
         </Text>
-        <View style={[styles.groupedCard, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}>
-          <View style={styles.themeRow}>
-            {[
-              { id: 'dark', label: 'Dark', icon: Moon },
-              { id: 'light', label: 'Light', icon: Sun },
-              { id: 'system', label: 'Automatic', icon: Smartphone },
-            ].map((t) => {
-              const isSelected = themePreference === t.id;
-              const Icon = t.icon;
-              return (
-                <TouchableOpacity
-                  key={t.id}
-                  activeOpacity={0.7}
-                  onPress={() => {
-                    try {
-                      Haptics.selectionAsync();
-                    } catch (e) {}
-                    setThemePreference(t.id as ThemePreference);
-                  }}
-                  style={[
-                    styles.themeOption,
+        <View
+          style={[
+            styles.appleSegmentTrack,
+            {
+              backgroundColor: isDark ? 'rgba(120, 120, 128, 0.22)' : 'rgba(120, 120, 128, 0.12)',
+              borderColor: colors.cardBorder,
+            },
+          ]}
+        >
+          {[
+            { id: 'dark', label: 'Dark', icon: AppleMoonIcon },
+            { id: 'light', label: 'Light', icon: AppleSunIcon },
+            { id: 'system', label: 'Automatic', icon: AppleAutoIcon },
+          ].map((t) => {
+            const isSelected = themePreference === t.id;
+            const Icon = t.icon;
+            return (
+              <TouchableOpacity
+                key={t.id}
+                activeOpacity={0.8}
+                onPress={() => {
+                  try {
+                    Haptics.selectionAsync();
+                  } catch (e) {}
+                  setThemePreference(t.id as ThemePreference);
+                }}
+                style={[
+                  styles.appleSegmentItem,
+                  isSelected && [
+                    styles.appleSegmentSelected,
                     {
-                      backgroundColor: isSelected ? (isDark ? '#2C2C2E' : '#FFFFFF') : 'transparent',
-                      borderColor: isSelected ? colors.accent : 'transparent',
-                      borderWidth: isSelected ? 1 : 0,
+                      backgroundColor: isDark ? '#636366' : '#FFFFFF',
+                      ...Platform.select({
+                        web: {
+                          boxShadow: isDark
+                            ? '0 2px 8px rgba(0, 0, 0, 0.35)'
+                            : '0 2px 8px rgba(0, 0, 0, 0.12)',
+                        } as any,
+                        default: {
+                          shadowColor: '#000000',
+                          shadowOffset: { width: 0, height: 1.5 },
+                          shadowOpacity: isDark ? 0.35 : 0.12,
+                          shadowRadius: 3,
+                          elevation: 2,
+                        },
+                      }),
+                    },
+                  ],
+                ]}
+              >
+                <Icon
+                  size={19}
+                  color={isSelected ? (isDark ? '#FFFFFF' : '#000000') : colors.textSecondary}
+                  style={{ marginBottom: 4 }}
+                />
+                <Text
+                  style={[
+                    styles.appleSegmentLabel,
+                    {
+                      color: isSelected ? (isDark ? '#FFFFFF' : '#000000') : colors.textSecondary,
+                      fontWeight: isSelected ? '600' : '500',
                     },
                   ]}
                 >
-                  <Icon size={18} color={isSelected ? colors.accent : colors.textSecondary} style={{ marginBottom: 4 }} />
-                  <Text
-                    style={[
-                      styles.themeLabel,
-                      { color: isSelected ? colors.textPrimary : colors.textSecondary, fontWeight: isSelected ? '600' : '400' },
-                    ]}
-                  >
-                    {t.label}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
+                  {t.label}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
         </View>
 
         {/* Section 5: Data & Spreadsheet Tools */}
@@ -783,6 +858,12 @@ export const SettingsScreen: React.FC = () => {
         onClose={() => setIsExportModalOpen(false)}
       />
 
+      {/* Dedicated Sender Profile Modal */}
+      <EditProfileModal
+        visible={isEditProfileOpen}
+        onClose={() => setIsEditProfileOpen(false)}
+      />
+
       {/* Personalization Modal */}
       <PersonalizationModal
         visible={isPersonalizationOpen}
@@ -961,20 +1042,26 @@ const styles = StyleSheet.create({
   timePillText: {
     fontSize: 13,
   },
-  themeRow: {
+  appleSegmentTrack: {
     flexDirection: 'row',
-    padding: 8,
-    gap: 8,
+    borderRadius: 14,
+    borderWidth: 0.5,
+    padding: 3,
+    marginBottom: 8,
+    gap: 3,
   },
-  themeOption: {
+  appleSegmentItem: {
     flex: 1,
-    paddingVertical: 12,
-    borderRadius: 10,
+    paddingVertical: 10,
+    borderRadius: 11,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  themeLabel: {
+  appleSegmentSelected: {
+    borderWidth: 0,
+  },
+  appleSegmentLabel: {
     fontSize: 12,
-    marginTop: 2,
+    letterSpacing: -0.2,
   },
 });

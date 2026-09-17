@@ -20,6 +20,8 @@ import {
   AlertCircle,
   ExternalLink,
   ShieldCheck,
+  ArrowUpCircle,
+  X,
 } from 'lucide-react-native';
 import { useBirthdays } from '../context/BirthdayContext';
 import { AppLogo } from './AppLogo';
@@ -160,25 +162,36 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({
             <View style={[styles.grabber, { backgroundColor: isDark ? '#3A3A3C' : '#D1D1D6' }]} />
           </View>
 
-          {/* Navigation Bar */}
-          <View style={styles.navHeader} {...panResponder.panHandlers}>
-            <View style={styles.navSpacer} />
-            <Text style={[styles.navTitle, { color: colors.textPrimary }]}>Software Update</Text>
-            <TouchableOpacity
-              activeOpacity={0.7}
-              onPress={handleClose}
-              style={styles.doneBtn}
-              disabled={downloading}
-            >
-              <Text
+          {/* Authentic Apple Navigation Bar */}
+          <View
+            style={[
+              styles.navHeader,
+              { borderBottomColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' },
+            ]}
+            {...panResponder.panHandlers}
+          >
+            <View style={styles.navSideSlot} />
+
+            <Text style={[styles.navCenterTitle, { color: colors.textPrimary }]}>
+              Software Update
+            </Text>
+
+            <View style={styles.navSideSlot}>
+              <TouchableOpacity
+                activeOpacity={0.7}
+                onPress={handleClose}
+                disabled={downloading}
                 style={[
-                  styles.doneText,
-                  { color: downloading ? colors.textMuted : colors.accent },
+                  styles.closeCircleBtn,
+                  {
+                    backgroundColor: isDark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.06)',
+                    opacity: downloading ? 0.4 : 1,
+                  },
                 ]}
               >
-                {downloading ? '' : 'Later'}
-              </Text>
-            </TouchableOpacity>
+                <X size={15} color={colors.textSecondary} />
+              </TouchableOpacity>
+            </View>
           </View>
 
           <ScrollView
@@ -408,26 +421,26 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingVertical: 10,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: 'rgba(120, 120, 128, 0.2)',
   },
-  navSpacer: {
-    width: 50,
-  },
-  navTitle: {
-    fontSize: 17,
-    fontWeight: '600',
-    letterSpacing: -0.4,
-  },
-  doneBtn: {
-    width: 50,
+  navSideSlot: {
+    width: 36,
     alignItems: 'flex-end',
+    justifyContent: 'center',
   },
-  doneText: {
+  navCenterTitle: {
     fontSize: 17,
     fontWeight: '600',
     letterSpacing: -0.4,
+    textAlign: 'center',
+  },
+  closeCircleBtn: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   body: {
     flex: 1,
@@ -579,11 +592,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingVertical: 14,
     borderRadius: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
-    shadowRadius: 4,
-    elevation: 3,
+    ...Platform.select({
+      web: { boxShadow: '0 2px 8px rgba(0,0,0,0.15)' },
+      default: { elevation: 3 },
+    }),
   },
   mainButtonText: {
     color: '#FFFFFF',

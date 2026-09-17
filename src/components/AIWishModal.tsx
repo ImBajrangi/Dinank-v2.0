@@ -46,18 +46,20 @@ export const AIWishModal: React.FC<AIWishModalProps> = ({
   onClose,
   birthday,
 }) => {
-  const { colors, isDark, settings } = useBirthdays();
+  const { colors, isDark, settings, updateSettings } = useBirthdays();
   const [selectedTone, setSelectedTone] = useState<WishTone>('heartfelt');
   const [customPrompt, setCustomPrompt] = useState('');
   const [showCustomPrompt, setShowCustomPrompt] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [savedPreset, setSavedPreset] = useState(false);
   const [currentWish, setCurrentWish] = useState<string>('');
 
   useEffect(() => {
     if (birthday && visible) {
       setCustomPrompt('');
       setShowCustomPrompt(false);
+      setSavedPreset(false);
       regenerate(selectedTone, '');
     }
   }, [birthday, visible]);
@@ -65,6 +67,7 @@ export const AIWishModal: React.FC<AIWishModalProps> = ({
   const regenerate = async (tone: WishTone, promptOverride?: string) => {
     if (!birthday) return;
     setIsGenerating(true);
+    setSavedPreset(false);
     const promptToUse = promptOverride !== undefined ? promptOverride : customPrompt;
     try {
       const generated = await generateAIWish({
@@ -77,6 +80,7 @@ export const AIWishModal: React.FC<AIWishModalProps> = ({
         session: birthday.session,
         senderName: settings.senderName,
         customPrompt: promptToUse,
+        geminiApiKey: settings.geminiApiKey,
       });
       setCurrentWish(generated);
     } catch (e) {
@@ -85,6 +89,8 @@ export const AIWishModal: React.FC<AIWishModalProps> = ({
         relationship: birthday.relationship,
         tone,
         turningAge: birthday.nextAge,
+        senderName: settings.senderName,
+        customPrompt: promptToUse,
       });
       setCurrentWish(fallback);
     } finally {
@@ -107,6 +113,33 @@ export const AIWishModal: React.FC<AIWishModalProps> = ({
     } catch (e) {}
     setCustomPrompt(sug);
     regenerate(selectedTone, sug);
+  };
+
+  const handleSaveAsPreset = () => {
+    if (!currentWish || !currentWish.trim()) return;
+    try {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    } catch (e) {}
+    
+    // Replace actual name with {name} token for reusable template
+    let templateText = currentWish;
+    if (birthday?.name) {
+      templateText = templateText.replace(new RegExp(birthday.name, 'g'), '{name}');
+    }
+    
+    const existing = settings.savedGreetingPresets || [];
+    const newPreset = {
+      id: `custom_${Date.now()}`,
+      label: customPrompt ? customPrompt.slice(0, 16) : `${selectedTone.charAt(0).toUpperCase() + selectedTone.slice(1)} Custom`,
+      text: templateText,
+      category: (birthday?.relationship === 'student' ? 'student' : 'general') as any,
+    };
+    
+    updateSettings({
+      savedGreetingPresets: [newPreset, ...existing],
+    });
+    setSavedPreset(true);
+    setTimeout(() => setSavedPreset(false), 2500);
   };
 
   const handleCopy = () => {
@@ -207,7 +240,7 @@ export const AIWishModal: React.FC<AIWishModalProps> = ({
           </View>
 
           <ScrollView style={styles.body} showsVerticalScrollIndicator={false}>
-            {/* Tone Selector Pills */}
+            {/* Tone & Saved Presets Pills */}
             <ScrollView
               horizontal
               showsHorizontalScrollIndicator={false}
@@ -245,6 +278,36 @@ export const AIWishModal: React.FC<AIWishModalProps> = ({
                   </TouchableOpacity>
                 );
               })}
+
+              {/* User Saved Custom Presets */}
+              {(settings.savedGreetingPresets || []).map((p) => (
+                <TouchableOpacity
+                  key={p.id}
+                  activeOpacity={0.7}
+                  onPress={() => {
+                    try {
+                      Haptics.selectionAsync();
+                    } catch (e) {}
+                    let customized = p.text.replace(/\{name\}/g, birthday.name);
+                    if (birthday.groupClass) customized = customized.replace(/\{class\}/g, birthday.groupClass);
+                    if (settings.senderName) customized = customized.replace(/\{sender_name\}/g, settings.senderName);
+                    setCurrentWish(customized);
+                  }}
+                  style={[
+                    styles.tonePill,
+                    {
+                      backgroundColor: isDark ? '#2C2C2E' : '#E5E5EA',
+                      borderWidth: 0.5,
+                      borderColor: colors.accent,
+                    },
+                  ]}
+                >
+                  <Sparkles size={12} color={colors.accent} style={{ marginRight: 4 }} />
+                  <Text style={[styles.tonePillText, { color: colors.textPrimary }]}>
+                    {p.label}
+                  </Text>
+                </TouchableOpacity>
+              ))}
             </ScrollView>
 
             {/* Hero Message Card */}
@@ -381,7 +444,22 @@ export const AIWishModal: React.FC<AIWishModalProps> = ({
                     <Copy size={16} color={colors.textSecondary} style={{ marginRight: 6 }} />
                   )}
                   <Text style={[styles.secBtnText, { color: copied ? colors.success : colors.textPrimary }]}>
-                    {copied ? 'Copied to Clipboard' : 'Copy'}
+                    {copied ? 'Copied' : 'Copy'}
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  activeOpacity={0.7}
+                  onPress={handleSaveAsPreset}
+                  style={[styles.secBtn, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}
+                >
+                  {savedPreset ? (
+                    <Check size={16} color={colors.success} style={{ marginRight: 6 }} />
+                  ) : (
+                    <Sparkles size={16} color={colors.accent} style={{ marginRight: 6 }} />
+                  )}
+                  <Text style={[styles.secBtnText, { color: savedPreset ? colors.success : colors.textPrimary }]}>
+                    {savedPreset ? 'Saved as Preset' : 'Save as Preset'}
                   </Text>
                 </TouchableOpacity>
 

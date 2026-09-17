@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, TextInput, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, TextInput, TouchableOpacity, StyleSheet, Platform } from 'react-native';
 import { Search, X } from 'lucide-react-native';
 import { useBirthdays } from '../context/BirthdayContext';
 
@@ -67,6 +67,11 @@ const styles = StyleSheet.create({
     fontSize: 16,
     paddingVertical: 0,
     letterSpacing: -0.2,
+    ...Platform.select({
+      web: {
+        outlineStyle: 'none',
+      } as any,
+    }),
   },
   clearBtn: {
     padding: 2,

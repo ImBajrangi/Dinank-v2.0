@@ -49,6 +49,13 @@ export interface CalculatedBirthday extends Birthday {
 
 export type ThemePreference = 'dark' | 'light' | 'system';
 
+export interface UserGreetingPreset {
+  id: string;
+  label: string;
+  text: string;
+  category?: 'student' | 'parent' | 'general';
+}
+
 export interface UserSettings {
   theme: ThemePreference;
   defaultReminderTime: string; // e.g. '09:00'
@@ -63,4 +70,7 @@ export interface UserSettings {
   accentColor?: string;
   notificationSound?: string;
   appIconTheme?: string;
+  geminiApiKey?: string;
+  savedGreetingPresets?: UserGreetingPreset[];
 }
+

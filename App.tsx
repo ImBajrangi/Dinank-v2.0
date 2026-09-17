@@ -21,6 +21,54 @@ import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-cont
 import * as Haptics from 'expo-haptics';
 import Svg, { Path, Rect, Circle } from 'react-native-svg';
 
+// Immediate web global style reset to eliminate all browser focus rings and outlines
+if (Platform.OS === 'web' && typeof document !== 'undefined') {
+  const injectGlobalStyles = () => {
+    const styleId = 'global-app-styles';
+    let style = document.getElementById(styleId) as HTMLStyleElement | null;
+    if (!style) {
+      style = document.createElement('style');
+      style.id = styleId;
+      document.head.appendChild(style);
+    }
+    style.textContent = `
+      *, *::before, *::after {
+        outline: none !important;
+        outline-style: none !important;
+        outline-width: 0 !important;
+        -webkit-tap-highlight-color: transparent !important;
+        -webkit-focus-ring-color: transparent !important;
+      }
+      input, textarea, select, button, a, div, span, [tabindex], [role="button"], [role="textbox"], [data-focusable="true"] {
+        outline: none !important;
+        outline-style: none !important;
+        outline-width: 0 !important;
+        -webkit-tap-highlight-color: transparent !important;
+      }
+      input:focus, textarea:focus, select:focus, button:focus, *:focus, *:focus-visible, *:focus-within {
+        outline: none !important;
+        outline-style: none !important;
+        outline-width: 0 !important;
+        box-shadow: none;
+      }
+    `;
+    // Inject Google Font Laila and Kalam for soft Hindi typography
+    const fontId = 'google-font-laila';
+    if (!document.getElementById(fontId)) {
+      const link = document.createElement('link');
+      link.id = fontId;
+      link.rel = 'stylesheet';
+      link.href = 'https://fonts.googleapis.com/css2?family=Kalam:wght@300;400;700&family=Laila:wght@400;500;600;700&display=swap';
+      document.head.appendChild(link);
+    }
+  };
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', injectGlobalStyles);
+  } else {
+    injectGlobalStyles();
+  }
+}
+
 // Professional Apple HIG Tab Icons with clean compound cutouts
 const AppleHomeIcon: React.FC<{ active: boolean; color: string; size?: number }> = ({ active, color, size = 22 }) => {
   if (active) {
@@ -217,6 +265,63 @@ const MainApp: React.FC = () => {
 
   const bottomInset = Math.max(insets.bottom, Platform.OS === 'ios' ? 20 : 8);
 
+  // Synchronize web background with theme and load Hindi font Laila
+  React.useEffect(() => {
+    if (Platform.OS === 'web' && typeof document !== 'undefined') {
+      document.documentElement.style.backgroundColor = colors.background;
+      document.body.style.backgroundColor = colors.background;
+      document.body.style.margin = '0';
+      document.body.style.padding = '0';
+      const root = document.getElementById('root');
+      if (root) {
+        root.style.backgroundColor = colors.background;
+      }
+
+      // Inject global CSS to eliminate all browser focus outlines, blue borders, and tap highlights
+      const styleId = 'global-app-styles';
+      let styleElement = document.getElementById(styleId) as HTMLStyleElement | null;
+      if (!styleElement) {
+        styleElement = document.createElement('style');
+        styleElement.id = styleId;
+        document.head.appendChild(styleElement);
+      }
+      styleElement.innerHTML = `
+        * {
+          outline: none !important;
+          outline-style: none !important;
+          outline-width: 0 !important;
+          -webkit-tap-highlight-color: transparent !important;
+        }
+        *:focus, *:focus-visible, *:focus-within {
+          outline: none !important;
+          outline-style: none !important;
+          outline-width: 0 !important;
+        }
+        input, textarea, select, button, a, [tabindex], [role="button"], [role="textbox"], [data-focusable="true"] {
+          outline: none !important;
+          outline-style: none !important;
+          outline-width: 0 !important;
+          -webkit-tap-highlight-color: transparent !important;
+        }
+        input:focus, textarea:focus, select:focus, button:focus {
+          outline: none !important;
+          outline-style: none !important;
+          outline-width: 0 !important;
+        }
+      `;
+
+      // Inject Google Font Laila
+      const fontId = 'google-font-laila';
+      if (!document.getElementById(fontId)) {
+        const link = document.createElement('link');
+        link.id = fontId;
+        link.rel = 'stylesheet';
+        link.href = 'https://fonts.googleapis.com/css2?family=Laila:wght@500;600;700&display=swap';
+        document.head.appendChild(link);
+      }
+    }
+  }, [colors.background]);
+
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       {/* Active Screen */}
@@ -403,6 +508,8 @@ export default function App() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    height: '100%',
+    width: '100%',
   },
   screenContainer: {
     flex: 1,

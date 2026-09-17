@@ -58,6 +58,18 @@ export class AutoUpdateService {
    * Check GitHub Releases for the latest version
    */
   static async checkForUpdates(forceRefresh = false): Promise<AppUpdateInfo> {
+    if (Platform.OS === 'web') {
+      return {
+        hasUpdate: false,
+        currentVersion: CURRENT_APP_VERSION,
+        latestVersion: CURRENT_APP_VERSION,
+        releaseTitle: `Dinank v${CURRENT_APP_VERSION}`,
+        releaseNotes: 'Web build is running the latest live version.',
+        downloadUrl: '',
+        htmlUrl: `https://github.com/${GITHUB_OWNER}/${GITHUB_REPO}`,
+      };
+    }
+
     const now = Date.now();
     if (!forceRefresh && cachedUpdateInfo && now - lastCheckTime < CACHE_TTL_MS) {
       return cachedUpdateInfo;

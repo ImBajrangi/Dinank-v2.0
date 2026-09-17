@@ -14,12 +14,14 @@ import {
 } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import {
-  GraduationCap,
-  Users,
   RotateCcw,
   Sparkles,
   MessageCircle,
   CheckCheck,
+  Check,
+  Plus,
+  Sliders,
+  X,
 } from 'lucide-react-native';
 import { useBirthdays } from '../context/BirthdayContext';
 
@@ -104,7 +106,6 @@ export const PersonalizationModal: React.FC<PersonalizationModalProps> = ({
   const { colors, isDark, settings, updateSettings } = useBirthdays();
 
   const [activeTab, setActiveTab] = useState<'student' | 'parent'>('student');
-  const [senderName, setSenderName] = useState(settings.senderName || '');
   const [studentTemplate, setStudentTemplate] = useState(
     settings.customStudentTemplate || DEFAULT_STUDENT_TEMPLATE
   );
@@ -112,6 +113,7 @@ export const PersonalizationModal: React.FC<PersonalizationModalProps> = ({
     settings.customParentTemplate || DEFAULT_PARENT_TEMPLATE
   );
   const [activePresetId, setActivePresetId] = useState<string>('academic');
+  const [savedSuccess, setSavedSuccess] = useState(false);
   const [selection, setSelection] = useState<{ start: number; end: number }>({
     start: 0,
     end: 0,
@@ -148,7 +150,6 @@ export const PersonalizationModal: React.FC<PersonalizationModalProps> = ({
   useEffect(() => {
     if (visible) {
       panY.setValue(0);
-      setSenderName(settings.senderName || '');
       const initStudent = settings.customStudentTemplate || DEFAULT_STUDENT_TEMPLATE;
       const initParent = settings.customParentTemplate || DEFAULT_PARENT_TEMPLATE;
       setStudentTemplate(initStudent);
@@ -156,6 +157,7 @@ export const PersonalizationModal: React.FC<PersonalizationModalProps> = ({
       setActivePresetId(activeTab === 'student' ? 'academic' : 'parent_academic');
       const curLen = (activeTab === 'student' ? initStudent : initParent).length;
       setSelection({ start: curLen, end: curLen });
+      setSavedSuccess(false);
     }
   }, [visible, settings]);
 
@@ -201,12 +203,14 @@ export const PersonalizationModal: React.FC<PersonalizationModalProps> = ({
     } catch (e) { }
 
     updateSettings({
-      senderName: senderName.trim(),
       customStudentTemplate: studentTemplate.trim(),
       customParentTemplate: parentTemplate.trim(),
     });
 
-    onClose();
+    setSavedSuccess(true);
+    setTimeout(() => {
+      onClose();
+    }, 600);
   };
 
   const handleResetDefaults = () => {
@@ -223,25 +227,20 @@ export const PersonalizationModal: React.FC<PersonalizationModalProps> = ({
   // Live sample preview
   const livePreviewText = useMemo(() => {
     const raw = activeTab === 'student' ? studentTemplate : parentTemplate;
-    const author = senderName.trim() || 'Well-wisher';
+    const author = settings.senderName?.trim() || 'Well-wisher';
     return raw
-      .replace(/\{name\}/g, 'Aarav')
+      .replace(/\{name\}/g, 'Aarav Sharma')
       .replace(/\{class\}/g, 'Class 10th-A')
       .replace(/\{age\}/g, '16')
       .replace(/\{session\}/g, '2024-25')
       .replace(/\{sender_name\}/g, author);
-  }, [activeTab, studentTemplate, parentTemplate, senderName]);
+  }, [activeTab, studentTemplate, parentTemplate, settings.senderName]);
 
   const currentPresets = activeTab === 'student' ? PRESETS_STUDENT : PRESETS_PARENT;
+  const userPresets = (settings.savedGreetingPresets || []).filter(
+    (p) => !p.category || p.category === 'general' || p.category === activeTab
+  );
 
-  // Backgrounds & hair lines matching iOS HIG
-  const cardBg = isDark ? '#1C1C1E' : '#FFFFFF';
-  const borderColor = isDark ? '#2C2C2E' : '#E5E5EA';
-  const screenBg = isDark ? '#000000' : '#F2F2F7';
-  const segmentedBg = isDark ? '#1C1C1E' : '#E3E3E8';
-  const segmentActiveBg = isDark ? '#3A3A3C' : '#FFFFFF';
-
-  // Cross-platform input style to remove web focus outline
   const webNoOutline = Platform.OS === 'web' ? ({ outlineStyle: 'none', outline: 'none' } as any) : {};
 
   return (
@@ -260,31 +259,47 @@ export const PersonalizationModal: React.FC<PersonalizationModalProps> = ({
           style={[
             styles.modalContent,
             {
-              backgroundColor: screenBg,
+              backgroundColor: isDark ? '#1C1C1E' : '#F2F2F7',
               transform: [{ translateY: panY }],
             },
           ]}
         >
           {/* Apple Sheet Grabber */}
           <View style={styles.handleContainer} {...panResponder.panHandlers}>
-            <View style={[styles.handleBar, { backgroundColor: isDark ? '#3A3A3C' : '#D1D1D6' }]} />
+            <View style={[styles.handleBar, { backgroundColor: isDark ? '#48484A' : '#C7C7CC' }]} />
           </View>
 
-          {/* Standard Apple iOS Navigation Bar */}
-          <View style={styles.navHeader} {...panResponder.panHandlers}>
-            <TouchableOpacity activeOpacity={0.7} onPress={onClose} style={styles.navBtnLeft}>
-              <Text style={[styles.navCancelText, { color: colors.accent }]}>Cancel</Text>
-            </TouchableOpacity>
+          {/* Authentic Apple Navigation Bar */}
+          <View
+            style={[
+              styles.navHeader,
+              { borderBottomColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' },
+            ]}
+            {...panResponder.panHandlers}
+          >
+            <View style={styles.navSideSlot} />
 
-            <View style={styles.navTitleContainer}>
-              <Text style={[styles.navTitle, { color: colors.textPrimary }]}>
-                Personalization
-              </Text>
+            <Text style={[styles.navCenterTitle, { color: colors.textPrimary }]}>
+              Greeting Templates
+            </Text>
+
+            <View style={styles.navSideSlot}>
+              <TouchableOpacity
+                activeOpacity={0.7}
+                onPress={() => {
+                  try {
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  } catch (e) {}
+                  onClose();
+                }}
+                style={[
+                  styles.closeCircleBtn,
+                  { backgroundColor: isDark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.06)' },
+                ]}
+              >
+                <X size={15} color={colors.textSecondary} />
+              </TouchableOpacity>
             </View>
-
-            <TouchableOpacity activeOpacity={0.7} onPress={handleSave} style={styles.navBtnRight}>
-              <Text style={[styles.navSaveText, { color: colors.accent }]}>Save</Text>
-            </TouchableOpacity>
           </View>
 
           <ScrollView
@@ -292,72 +307,35 @@ export const PersonalizationModal: React.FC<PersonalizationModalProps> = ({
             contentContainerStyle={styles.scrollContent}
             showsVerticalScrollIndicator={false}
             keyboardShouldPersistTaps="handled"
-            keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
           >
-            {/* Section 1: Sender Name */}
-            <Text style={[styles.sectionHeader, { color: colors.textSecondary }]}>
-              SENDER NAME
-            </Text>
-            <View
-              style={[
-                styles.insetCard,
-                { backgroundColor: cardBg, borderColor: borderColor },
-              ]}
-            >
-              <TextInput
-                value={senderName}
-                onChangeText={setSenderName}
-                placeholder="e.g. Prof. Sharma / Teacher"
-                placeholderTextColor={colors.textMuted}
-                style={[styles.senderInput, { color: colors.textPrimary }, webNoOutline]}
-                clearButtonMode="while-editing"
-                autoCapitalize="words"
-              />
-            </View>
-            <Text style={[styles.sectionFooter, { color: colors.textSecondary }]}>
-              Appears as the sign-off name in your birthday greetings and messages.
-            </Text>
-
-            {/* Section 2: Wish Category & Presets */}
-            <Text style={[styles.sectionHeader, { color: colors.textSecondary, marginTop: 22 }]}>
-              WISH TEMPLATES
-            </Text>
-
-            {/* iOS Segmented Control */}
-            <View style={[styles.segmentedControl, { backgroundColor: segmentedBg }]}>
+            {/* Category Switcher Pills */}
+            <View style={styles.categoryRow}>
               <TouchableOpacity
                 activeOpacity={0.7}
                 onPress={() => {
                   try {
                     Haptics.selectionAsync();
-                  } catch (e) { }
+                  } catch (e) {}
                   setActiveTab('student');
                   setActivePresetId('academic');
-                  setSelection({ start: studentTemplate.length, end: studentTemplate.length });
                 }}
                 style={[
-                  styles.segmentBtn,
-                  activeTab === 'student' && [
-                    styles.segmentBtnActive,
-                    { backgroundColor: segmentActiveBg },
-                  ],
+                  styles.categoryPill,
+                  {
+                    backgroundColor: activeTab === 'student' ? colors.accent : isDark ? '#2C2C2E' : '#E5E5EA',
+                  },
                 ]}
               >
-                <GraduationCap
-                  size={14}
-                  color={activeTab === 'student' ? colors.accent : colors.textSecondary}
-                  style={{ marginRight: 6 }}
-                />
                 <Text
                   style={[
-                    styles.segmentText,
+                    styles.categoryPillText,
                     {
-                      color: activeTab === 'student' ? colors.textPrimary : colors.textSecondary,
+                      color: activeTab === 'student' ? '#FFFFFF' : colors.textPrimary,
                       fontWeight: activeTab === 'student' ? '600' : '400',
                     },
                   ]}
                 >
-                  Student Wish
+                  Student Wishes
                 </Text>
               </TouchableOpacity>
 
@@ -366,44 +344,36 @@ export const PersonalizationModal: React.FC<PersonalizationModalProps> = ({
                 onPress={() => {
                   try {
                     Haptics.selectionAsync();
-                  } catch (e) { }
+                  } catch (e) {}
                   setActiveTab('parent');
                   setActivePresetId('parent_academic');
-                  setSelection({ start: parentTemplate.length, end: parentTemplate.length });
                 }}
                 style={[
-                  styles.segmentBtn,
-                  activeTab === 'parent' && [
-                    styles.segmentBtnActive,
-                    { backgroundColor: segmentActiveBg },
-                  ],
+                  styles.categoryPill,
+                  {
+                    backgroundColor: activeTab === 'parent' ? colors.accent : isDark ? '#2C2C2E' : '#E5E5EA',
+                  },
                 ]}
               >
-                <Users
-                  size={14}
-                  color={activeTab === 'parent' ? colors.accent : colors.textSecondary}
-                  style={{ marginRight: 6 }}
-                />
                 <Text
                   style={[
-                    styles.segmentText,
+                    styles.categoryPillText,
                     {
-                      color: activeTab === 'parent' ? colors.textPrimary : colors.textSecondary,
+                      color: activeTab === 'parent' ? '#FFFFFF' : colors.textPrimary,
                       fontWeight: activeTab === 'parent' ? '600' : '400',
                     },
                   ]}
                 >
-                  Parent WhatsApp
+                  Parent Wishes
                 </Text>
               </TouchableOpacity>
             </View>
 
-            {/* Template Presets Carousel */}
+            {/* Presets Row */}
             <ScrollView
               horizontal
               showsHorizontalScrollIndicator={false}
               contentContainerStyle={styles.presetsContainer}
-              keyboardShouldPersistTaps="handled"
             >
               {currentPresets.map((pr) => {
                 const isSelected = activePresetId === pr.id;
@@ -416,24 +386,54 @@ export const PersonalizationModal: React.FC<PersonalizationModalProps> = ({
                       styles.presetPill,
                       {
                         backgroundColor: isSelected
-                          ? colors.accentLight
+                          ? colors.accent
                           : isDark
-                          ? '#1C1C1E'
-                          : '#FFFFFF',
-                        borderColor: isSelected ? colors.accent : borderColor,
+                          ? '#2C2C2E'
+                          : '#E5E5EA',
                       },
                     ]}
                   >
-                    <Sparkles
-                      size={12}
-                      color={isSelected ? colors.accent : colors.textMuted}
-                      style={{ marginRight: 5 }}
-                    />
                     <Text
                       style={[
                         styles.presetPillText,
                         {
-                          color: isSelected ? colors.accent : colors.textPrimary,
+                          color: isSelected ? '#FFFFFF' : colors.textPrimary,
+                          fontWeight: isSelected ? '600' : '400',
+                        },
+                      ]}
+                    >
+                      {pr.label}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+
+              {userPresets.map((pr) => {
+                const isSelected = activePresetId === pr.id;
+                return (
+                  <TouchableOpacity
+                    key={pr.id}
+                    activeOpacity={0.7}
+                    onPress={() => handleSelectPreset(pr)}
+                    style={[
+                      styles.presetPill,
+                      {
+                        backgroundColor: isSelected
+                          ? colors.accent
+                          : isDark
+                          ? '#2C2C2E'
+                          : '#E5E5EA',
+                        borderWidth: 0.5,
+                        borderColor: colors.accent,
+                      },
+                    ]}
+                  >
+                    <Sparkles size={12} color={isSelected ? '#FFFFFF' : colors.accent} style={{ marginRight: 4 }} />
+                    <Text
+                      style={[
+                        styles.presetPillText,
+                        {
+                          color: isSelected ? '#FFFFFF' : colors.textPrimary,
                           fontWeight: isSelected ? '600' : '400',
                         },
                       ]}
@@ -445,42 +445,36 @@ export const PersonalizationModal: React.FC<PersonalizationModalProps> = ({
               })}
             </ScrollView>
 
-            {/* Section 3: Template Editor Card */}
-            <Text style={[styles.sectionHeader, { color: colors.textSecondary, marginTop: 20 }]}>
-              CUSTOM MESSAGE
-            </Text>
-            <View
-              style={[
-                styles.insetCard,
-                { backgroundColor: cardBg, borderColor: borderColor },
-              ]}
-            >
+            {/* Hero Template Card */}
+            <View style={[styles.templateCard, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}>
               <TextInput
                 value={activeTab === 'student' ? studentTemplate : parentTemplate}
                 onChangeText={activeTab === 'student' ? setStudentTemplate : setParentTemplate}
                 onSelectionChange={(e) => setSelection(e.nativeEvent.selection)}
                 multiline
-                scrollEnabled={false}
-                style={[styles.templateTextArea, { color: colors.textPrimary }, webNoOutline]}
-                placeholderTextColor={colors.textMuted}
+                style={[styles.templateInput, { color: colors.textPrimary }, webNoOutline]}
+                placeholderTextColor={colors.textSecondary}
+                placeholder="Write your greeting template here..."
               />
 
-              {/* Quick-Insert Token Shelf */}
-              <View style={[styles.tokenShelf, { borderTopColor: borderColor }]}>
+              <View style={[styles.cardDivider, { backgroundColor: colors.surfaceBorder }]} />
+
+              {/* Quick-Insert Token Bar */}
+              <View style={styles.tokenShelf}>
                 <Text style={[styles.tokenShelfLabel, { color: colors.textSecondary }]}>
-                  + Insert:
+                  Insert:
                 </Text>
                 <ScrollView
                   horizontal
                   showsHorizontalScrollIndicator={false}
-                  contentContainerStyle={styles.tokensScrollContent}
+                  contentContainerStyle={styles.tokensScroll}
                   keyboardShouldPersistTaps="always"
                 >
                   {[
                     { label: 'Name', token: '{name}' },
                     { label: 'Class', token: '{class}' },
                     { label: 'Age', token: '{age}' },
-                    { label: 'My Name', token: '{sender_name}' },
+                    { label: 'Sender', token: '{sender_name}' },
                   ].map((tok) => (
                     <TouchableOpacity
                       key={tok.token}
@@ -489,12 +483,12 @@ export const PersonalizationModal: React.FC<PersonalizationModalProps> = ({
                       style={[
                         styles.tokenChip,
                         {
-                          backgroundColor: isDark ? '#2C2C2E' : '#F2F2F7',
-                          borderColor: borderColor,
+                          backgroundColor: isDark ? '#2C2C2E' : '#E5E5EA',
                         },
                       ]}
                     >
-                      <Text style={[styles.tokenChipText, { color: colors.accent }]}>
+                      <Plus size={11} color={colors.accent} style={{ marginRight: 3 }} />
+                      <Text style={[styles.tokenChipText, { color: colors.textPrimary }]}>
                         {tok.label}
                       </Text>
                     </TouchableOpacity>
@@ -503,10 +497,7 @@ export const PersonalizationModal: React.FC<PersonalizationModalProps> = ({
               </View>
             </View>
 
-            {/* Section 4: WhatsApp Live Preview (Rich Formatted) */}
-            <Text style={[styles.sectionHeader, { color: colors.textSecondary, marginTop: 22 }]}>
-              LIVE PREVIEW
-            </Text>
+            {/* Live Preview Card */}
             <View
               style={[
                 styles.previewCard,
@@ -518,10 +509,9 @@ export const PersonalizationModal: React.FC<PersonalizationModalProps> = ({
             >
               <View style={styles.previewHeaderRow}>
                 <MessageCircle size={14} color="#25D366" style={{ marginRight: 6 }} />
-                <Text style={styles.previewBadgeText}>WhatsApp Message Preview</Text>
+                <Text style={styles.previewBadgeText}>WhatsApp Live Preview</Text>
               </View>
 
-              {/* Formatted Text (Parses *bold* to bold text) */}
               <Text style={styles.previewBodyText}>
                 {renderFormattedWhatsAppText(
                   livePreviewText,
@@ -529,7 +519,6 @@ export const PersonalizationModal: React.FC<PersonalizationModalProps> = ({
                 )}
               </Text>
 
-              {/* WhatsApp Message Metadata (Timestamp & Read Receipts) */}
               <View style={styles.previewMetaRow}>
                 <Text style={[styles.previewMetaTime, { color: isDark ? '#8696A0' : '#667781' }]}>
                   09:00 AM
@@ -538,19 +527,34 @@ export const PersonalizationModal: React.FC<PersonalizationModalProps> = ({
               </View>
             </View>
 
-            {/* Section 5: Reset Button */}
-            <TouchableOpacity
-              activeOpacity={0.7}
-              onPress={handleResetDefaults}
-              style={styles.resetBtn}
-            >
-              <RotateCcw size={14} color={colors.textSecondary} style={{ marginRight: 6 }} />
-              <Text style={[styles.resetBtnText, { color: colors.textSecondary }]}>
-                Restore Default Templates
-              </Text>
-            </TouchableOpacity>
+            {/* Actions */}
+            <View style={styles.actionsBox}>
+              <TouchableOpacity
+                activeOpacity={0.8}
+                onPress={handleSave}
+                style={[styles.primaryBtn, { backgroundColor: '#34C759' }]}
+              >
+                {savedSuccess ? (
+                  <Check size={18} color="#FFFFFF" style={{ marginRight: 6 }} />
+                ) : null}
+                <Text style={styles.primaryBtnText}>
+                  {savedSuccess ? 'Saved Successfully!' : 'Save Template'}
+                </Text>
+              </TouchableOpacity>
 
-            <View style={{ height: 24 }} />
+              <TouchableOpacity
+                activeOpacity={0.7}
+                onPress={handleResetDefaults}
+                style={[styles.secBtn, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}
+              >
+                <RotateCcw size={14} color={colors.textSecondary} style={{ marginRight: 6 }} />
+                <Text style={[styles.secBtnText, { color: colors.textPrimary }]}>
+                  Restore Default Templates
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            <View style={{ height: 40 }} />
           </ScrollView>
         </Animated.View>
       </KeyboardAvoidingView>
@@ -567,7 +571,7 @@ const styles = StyleSheet.create({
   modalContent: {
     borderTopLeftRadius: 18,
     borderTopRightRadius: 18,
-    height: '90%',
+    maxHeight: '92%',
   },
   handleContainer: {
     alignItems: 'center',
@@ -584,150 +588,111 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingVertical: 10,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: 'rgba(120, 120, 128, 0.2)',
   },
-  navBtnLeft: {
-    minWidth: 60,
-    alignItems: 'flex-start',
-  },
-  navCancelText: {
-    fontSize: 17,
-    letterSpacing: -0.4,
-  },
-  navTitleContainer: {
-    flex: 1,
-    alignItems: 'center',
-  },
-  navTitle: {
-    fontSize: 17,
-    fontWeight: '600',
-    letterSpacing: -0.4,
-  },
-  navBtnRight: {
-    minWidth: 60,
+  navSideSlot: {
+    width: 36,
     alignItems: 'flex-end',
+    justifyContent: 'center',
   },
-  navSaveText: {
+  navCenterTitle: {
     fontSize: 17,
     fontWeight: '600',
     letterSpacing: -0.4,
+    textAlign: 'center',
+  },
+  closeCircleBtn: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   scrollBody: {
     flex: 1,
+    paddingHorizontal: 16,
   },
   scrollContent: {
-    paddingHorizontal: 16,
-    paddingTop: 8,
-    paddingBottom: Platform.OS === 'ios' ? 120 : 80,
+    paddingTop: 4,
   },
-  sectionHeader: {
-    fontSize: 12,
-    fontWeight: '500',
-    letterSpacing: 0.5,
-    marginBottom: 6,
-    paddingHorizontal: 4,
-    textTransform: 'uppercase',
-  },
-  sectionFooter: {
-    fontSize: 13,
-    marginTop: 6,
-    marginBottom: 6,
-    paddingHorizontal: 4,
-    lineHeight: 18,
-  },
-  insetCard: {
-    borderRadius: 12,
-    borderWidth: StyleSheet.hairlineWidth,
-    overflow: 'hidden',
-  },
-  senderInput: {
-    paddingHorizontal: 16,
-    height: 48,
-    fontSize: 16,
-    letterSpacing: -0.3,
-  },
-  segmentedControl: {
+  categoryRow: {
     flexDirection: 'row',
-    borderRadius: 9,
-    padding: 2,
-    height: 36,
-    marginBottom: 10,
+    gap: 8,
+    marginVertical: 8,
   },
-  segmentBtn: {
+  categoryPill: {
     flex: 1,
-    flexDirection: 'row',
+    paddingVertical: 8,
+    borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 7,
   },
-  segmentBtnActive: {
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.12,
-    shadowRadius: 2,
-    elevation: 2,
-  },
-  segmentText: {
+  categoryPillText: {
     fontSize: 13,
   },
   presetsContainer: {
+    flexDirection: 'row',
     gap: 8,
-    paddingVertical: 2,
-    paddingHorizontal: 2,
+    paddingVertical: 8,
   },
   presetPill: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 12,
+    paddingHorizontal: 14,
     paddingVertical: 7,
     borderRadius: 16,
-    borderWidth: 1,
   },
   presetPillText: {
     fontSize: 13,
   },
-  templateTextArea: {
-    paddingHorizontal: 14,
-    paddingTop: 14,
-    paddingBottom: 14,
+  templateCard: {
+    borderRadius: 14,
+    borderWidth: 0.5,
+    overflow: 'hidden',
+    marginTop: 6,
+  },
+  templateInput: {
+    padding: 14,
     fontSize: 15,
-    minHeight: 120,
-    textAlignVertical: 'top',
     lineHeight: 22,
+    minHeight: 100,
+    textAlignVertical: 'top',
+  },
+  cardDivider: {
+    height: 0.5,
   },
   tokenShelf: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 12,
     paddingVertical: 8,
-    borderTopWidth: StyleSheet.hairlineWidth,
+    gap: 8,
   },
   tokenShelfLabel: {
     fontSize: 12,
     fontWeight: '600',
-    marginRight: 8,
   },
-  tokensScrollContent: {
+  tokensScroll: {
+    flexDirection: 'row',
     gap: 6,
   },
   tokenChip: {
-    paddingHorizontal: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 9,
     paddingVertical: 5,
     borderRadius: 10,
-    borderWidth: 1,
   },
   tokenChipText: {
     fontSize: 12,
-    fontWeight: '600',
+    fontWeight: '500',
   },
   previewCard: {
-    padding: 14,
     borderRadius: 14,
     borderWidth: 1,
-    borderBottomLeftRadius: 4,
-    marginBottom: 6,
+    padding: 14,
+    marginTop: 12,
   },
   previewHeaderRow: {
     flexDirection: 'row',
@@ -735,10 +700,8 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   previewBadgeText: {
-    fontSize: 11,
-    fontWeight: '700',
-    letterSpacing: 0.5,
-    textTransform: 'uppercase',
+    fontSize: 12,
+    fontWeight: '600',
     color: '#25D366',
   },
   previewBodyText: {
@@ -749,20 +712,39 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'flex-end',
-    marginTop: 8,
+    marginTop: 6,
   },
   previewMetaTime: {
     fontSize: 11,
   },
-  resetBtn: {
+  actionsBox: {
+    marginTop: 18,
+    gap: 10,
+  },
+  primaryBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 14,
-    marginTop: 12,
+    height: 48,
+    borderRadius: 12,
   },
-  resetBtnText: {
-    fontSize: 13,
+  primaryBtnText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '600',
+    letterSpacing: -0.3,
+  },
+  secBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    height: 44,
+    borderRadius: 12,
+    borderWidth: 0.5,
+  },
+  secBtnText: {
+    fontSize: 14,
     fontWeight: '500',
   },
 });
+
