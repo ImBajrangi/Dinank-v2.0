@@ -8,10 +8,17 @@ import {
   Platform,
   StatusBar,
   RefreshControl,
+  ScrollView,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
-import { Plus, Bell } from 'lucide-react-native';
+import {
+  Plus,
+  Bell,
+  Sparkles,
+  Cake,
+  Calendar as CalendarIcon,
+} from 'lucide-react-native';
 import { useBirthdays } from '../context/BirthdayContext';
 import { BirthdayCard } from '../components/BirthdayCard';
 import { SearchBar } from '../components/SearchBar';
@@ -25,6 +32,7 @@ interface HomeScreenProps {
 }
 
 const WEEKDAYS = ['SUNDAY', 'MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY'];
+const SHORT_WEEKDAYS = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
 const MONTHS_UPPER = [
   'JANUARY', 'FEBRUARY', 'MARCH', 'APRIL', 'MAY', 'JUNE',
   'JULY', 'AUGUST', 'SEPTEMBER', 'OCTOBER', 'NOVEMBER', 'DECEMBER'
@@ -40,12 +48,16 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     isDark,
     todayBirthdays,
     upcomingBirthdays,
+    birthdays,
     triggerSystemNotificationTest,
     refreshNotifications,
     settings,
   } = useBirthdays();
+
   const insets = useSafeAreaInsets();
   const [searchQuery, setSearchQuery] = useState('');
+  const [selectedFilter, setSelectedFilter] = useState<string>('all');
+  const [selectedDayOffset, setSelectedDayOffset] = useState<number | null>(null);
   const [refreshing, setRefreshing] = useState(false);
 
   const onRefresh = useCallback(async () => {
@@ -62,34 +74,118 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     Platform.OS === 'android' ? (StatusBar.currentHeight || 28) : 20
   );
 
-  // Dynamic personalized greeting
-  const greeting = useMemo(() => {
-    const hr = new Date().getHours();
-    const timeGreeting = hr < 12 ? 'Good morning' : hr < 17 ? 'Good afternoon' : 'Good evening';
-    return settings.senderName ? `${timeGreeting}, ${settings.senderName}` : 'Dinank';
+  // Clean, modern app title
+  const title = useMemo(() => {
+    return settings.senderName ? `Hello, ${settings.senderName}` : 'Dinank';
   }, [settings.senderName]);
 
-  // Formatted date string in Apple style e.g. "TUESDAY, SEPTEMBER 15"
+  // Formatted date string e.g. "THURSDAY, SEPTEMBER 17"
   const todayDateString = useMemo(() => {
     const d = new Date();
     return `${WEEKDAYS[d.getDay()]}, ${MONTHS_UPPER[d.getMonth()]} ${d.getDate()}`;
   }, []);
 
+  const monthYearString = useMemo(() => {
+    const d = new Date();
+    return `${MONTHS_UPPER[d.getMonth()]} ${d.getFullYear()}`;
+  }, []);
+
+  // 7-day Apple-style interactive week strip
+  const weekStrip = useMemo(() => {
+    const now = new Date();
+    const days = [];
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() + i);
+      const dayNum = d.getDate();
+      const dayName = SHORT_WEEKDAYS[d.getDay()];
+      const isToday = i === 0;
+
+      // Check birthdays for this day offset
+      const celebrants = (i === 0 ? todayBirthdays : []).concat(
+        upcomingBirthdays.filter((b) => b.daysUntil === i)
+      );
+
+      days.push({
+        offset: i,
+        dayNum,
+        dayName,
+        isToday,
+        hasBirthday: celebrants.length > 0,
+        bdayCount: celebrants.length,
+        celebrants,
+      });
+    }
+    return days;
+  }, [todayBirthdays, upcomingBirthdays]);
+
+  // Count of total birthdays this entire week
+  const weekBirthdayCount = useMemo(() => {
+    return weekStrip.reduce((acc, curr) => acc + curr.bdayCount, 0);
+  }, [weekStrip]);
+
+  // Dynamic list of classes/departments
+  const availableClasses = useMemo(() => {
+    const classes = new Set<string>();
+    birthdays.forEach((b) => {
+      if (b.groupClass && b.groupClass.trim()) {
+        classes.add(b.groupClass.trim());
+      }
+    });
+    return Array.from(classes).sort();
+  }, [birthdays]);
+
+  const thisMonthCount = useMemo(() => {
+    return upcomingBirthdays.filter((b) => b.daysUntil <= 30).length;
+  }, [upcomingBirthdays]);
+
+  // Selected day info
+  const activeDayData = useMemo(() => {
+    if (selectedDayOffset === null) return null;
+    return weekStrip.find((w) => w.offset === selectedDayOffset) || null;
+  }, [selectedDayOffset, weekStrip]);
+
+  const nextUpcoming = useMemo(() => {
+    return upcomingBirthdays.length > 0 ? upcomingBirthdays[0] : null;
+  }, [upcomingBirthdays]);
+
   const filteredToday = useMemo(() => {
+    if (selectedDayOffset !== null && selectedDayOffset !== 0) return [];
     if (!searchQuery.trim()) return todayBirthdays;
     const q = searchQuery.toLowerCase();
     return todayBirthdays.filter(
-      (b) => b.name.toLowerCase().includes(q) || b.relationship.toLowerCase().includes(q)
+      (b) =>
+        b.name.toLowerCase().includes(q) ||
+        b.relationship.toLowerCase().includes(q) ||
+        (b.groupClass && b.groupClass.toLowerCase().includes(q)) ||
+        (b.rollNo && b.rollNo.toLowerCase().includes(q)) ||
+        (b.section && b.section.toLowerCase().includes(q))
     );
-  }, [todayBirthdays, searchQuery]);
+  }, [todayBirthdays, selectedDayOffset, searchQuery]);
 
   const filteredUpcoming = useMemo(() => {
-    if (!searchQuery.trim()) return upcomingBirthdays;
+    let list = upcomingBirthdays;
+
+    if (selectedDayOffset !== null) {
+      list = list.filter((b) => b.daysUntil === selectedDayOffset);
+    } else if (selectedFilter === 'month') {
+      list = list.filter((b) => b.daysUntil <= 30);
+    } else if (selectedFilter !== 'all') {
+      list = list.filter(
+        (b) => b.groupClass && b.groupClass.trim().toLowerCase() === selectedFilter.toLowerCase()
+      );
+    }
+
+    if (!searchQuery.trim()) return list;
     const q = searchQuery.toLowerCase();
-    return upcomingBirthdays.filter(
-      (b) => b.name.toLowerCase().includes(q) || b.relationship.toLowerCase().includes(q)
+    return list.filter(
+      (b) =>
+        b.name.toLowerCase().includes(q) ||
+        b.relationship.toLowerCase().includes(q) ||
+        (b.groupClass && b.groupClass.toLowerCase().includes(q)) ||
+        (b.rollNo && b.rollNo.toLowerCase().includes(q)) ||
+        (b.section && b.section.toLowerCase().includes(q))
     );
-  }, [upcomingBirthdays, searchQuery]);
+  }, [upcomingBirthdays, selectedFilter, selectedDayOffset, searchQuery]);
 
   const handleTestNotification = () => {
     try {
@@ -100,18 +196,18 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
 
   const renderHeader = () => (
     <View style={[styles.headerContainer, { paddingTop: topInset + 8 }]}>
-      {/* Apple iOS Navigation Bar Header */}
+      {/* Navigation Bar Header */}
       <View style={styles.navBarRow}>
         <View style={{ flex: 1 }}>
           <Text style={[styles.dateSubtitle, { color: colors.textSecondary }]}>
             {todayDateString}
           </Text>
           <Text style={[styles.largeTitle, { color: colors.textPrimary }]}>
-            {greeting}
+            {title}
           </Text>
         </View>
 
-        {/* Right Navigation Actions (Apple Style) */}
+        {/* Right Navigation Actions */}
         <View style={styles.navActionButtons}>
           <TouchableOpacity
             activeOpacity={0.7}
@@ -127,26 +223,197 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           <TouchableOpacity
             activeOpacity={0.7}
             onPress={onOpenAdd}
-            style={[styles.addIconBtn, { backgroundColor: colors.accent }]}
+            style={[
+              styles.addIconBtn,
+              {
+                backgroundColor: colors.accent,
+                ...Platform.select({
+                  web: { boxShadow: '0 2px 8px rgba(0,122,255,0.3)' } as any,
+                  default: { elevation: 3 },
+                }),
+              },
+            ]}
           >
             <Plus size={20} color="#FFFFFF" strokeWidth={2.5} />
           </TouchableOpacity>
         </View>
       </View>
 
-      {/* iOS Search Bar */}
-      <SearchBar value={searchQuery} onChangeText={setSearchQuery} />
+      {/* Search Bar */}
+      <SearchBar
+        value={searchQuery}
+        onChangeText={setSearchQuery}
+        placeholder="Search name, class, section, roll no..."
+      />
 
-      {/* Today Section */}
+      {/* Apple-Style iOS 18 Week Calendar Widget */}
+      <View
+        style={[
+          styles.appleWidgetContainer,
+          {
+            backgroundColor: colors.card,
+            borderColor: isDark ? colors.surfaceBorder : colors.cardBorder,
+            ...Platform.select({
+              web: { boxShadow: '0 4px 20px rgba(0,0,0,0.06)' } as any,
+              default: { elevation: 2 },
+            }),
+          },
+        ]}
+      >
+        {/* Widget Top Header Bar */}
+        <View style={styles.widgetHeaderRow}>
+          <View style={styles.widgetHeaderLeft}>
+            <CalendarIcon size={14} color={colors.accent} />
+            <Text style={[styles.widgetMonthText, { color: colors.textPrimary }]}>
+              {monthYearString}
+            </Text>
+          </View>
+        </View>
+
+        {/* 7-Day Day Columns (Apple Calendar Style with Orange Birthday Circles) */}
+        <View style={styles.weekStripDays}>
+          {weekStrip.map((item) => {
+            const isSelected = selectedDayOffset === item.offset;
+            const isToday = item.isToday;
+
+            return (
+              <TouchableOpacity
+                key={item.offset}
+                activeOpacity={0.7}
+                onPress={() => {
+                  try {
+                    Haptics.selectionAsync();
+                  } catch (e) {}
+                  setSelectedDayOffset(selectedDayOffset === item.offset ? null : item.offset);
+                }}
+                style={styles.dayColumn}
+              >
+                {/* Day of Week Label (e.g. THU) */}
+                <Text
+                  style={[
+                    styles.dayNameLabel,
+                    {
+                      color: isToday
+                        ? colors.accent
+                        : colors.textSecondary,
+                      fontWeight: isToday ? '700' : '600',
+                    },
+                  ]}
+                >
+                  {item.dayName}
+                </Text>
+
+                {/* Day Number Circle with Orange Birthday Outline */}
+                <View
+                  style={[
+                    styles.dayNumCircle,
+                    isToday
+                      ? {
+                          backgroundColor: colors.accent,
+                          ...(item.hasBirthday ? { borderWidth: 2, borderColor: '#FF9500' } : {}),
+                          ...Platform.select({
+                            web: { boxShadow: '0 2px 6px rgba(0,122,255,0.4)' } as any,
+                            default: { elevation: 2 },
+                          }),
+                        }
+                      : item.hasBirthday
+                      ? {
+                          borderWidth: 1.5,
+                          borderColor: '#FF9500',
+                          backgroundColor: isDark ? 'rgba(255,149,0,0.1)' : '#FFF9F0',
+                        }
+                      : isSelected
+                      ? {
+                          backgroundColor: isDark ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.1)',
+                          borderWidth: 1,
+                          borderColor: colors.accent,
+                        }
+                      : null,
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.dayNumText,
+                      {
+                        color: isToday
+                          ? '#FFFFFF'
+                          : item.hasBirthday
+                          ? '#FF9500'
+                          : colors.textPrimary,
+                        fontWeight: isToday || item.hasBirthday ? '800' : '600',
+                      },
+                    ]}
+                  >
+                    {item.dayNum}
+                  </Text>
+                </View>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+
+        {/* Dynamic Context Peek Ribbon */}
+        <View
+          style={[
+            styles.contextPeekBar,
+            {
+              backgroundColor: isDark ? colors.surface : colors.surfaceSubtle,
+              borderTopColor: isDark ? colors.surfaceBorder : colors.cardBorder,
+            },
+          ]}
+        >
+          {activeDayData ? (
+            activeDayData.celebrants.length > 0 ? (
+              <View style={styles.peekContentRow}>
+                <Cake size={14} color="#FF9500" />
+                <Text style={[styles.peekMainText, { color: colors.textPrimary }]} numberOfLines={1}>
+                  {activeDayData.celebrants.map((c) => `${c.name} (${c.groupClass || c.relationship})`).join(', ')}
+                </Text>
+              </View>
+            ) : (
+              <Text style={[styles.peekSubText, { color: colors.textMuted }]}>
+                No celebrations on {activeDayData.dayName}, {activeDayData.dayNum}
+              </Text>
+            )
+          ) : nextUpcoming ? (
+            <View style={styles.peekContentRow}>
+              <Sparkles size={14} color="#007AFF" />
+              <Text style={[styles.peekMainText, { color: colors.textPrimary }]} numberOfLines={1}>
+                Next: {nextUpcoming.name}
+                {nextUpcoming.groupClass ? ` • ${nextUpcoming.groupClass}` : ''} (in {nextUpcoming.daysUntil} days)
+              </Text>
+            </View>
+          ) : (
+            <Text style={[styles.peekSubText, { color: colors.textMuted }]}>
+              All clear across your cohorts
+            </Text>
+          )}
+        </View>
+      </View>
+
+      {/* CASE 1: BIRTHDAYS TODAY */}
       {filteredToday.length > 0 && (
         <View style={styles.sectionBlock}>
-          <View style={styles.sectionHeaderRow}>
-            <Text style={[styles.iosSectionTitle, { color: colors.textSecondary }]}>
-              TODAY
-            </Text>
-            <Text style={[styles.iosBadgeText, { color: colors.danger }]}>
-              {filteredToday.length} today
-            </Text>
+          <View
+            style={[
+              styles.todayCelebrationBanner,
+              {
+                backgroundColor: isDark ? '#1F1A00' : '#FFFBEB',
+                borderColor: '#F59E0B',
+              },
+            ]}
+          >
+            <View style={styles.todayBannerHeader}>
+              <View style={styles.todayBadgeTag}>
+                <Cake size={18} color="#D97706" />
+                <Text style={styles.todayBadgeText}>TODAY'S CELEBRATIONS</Text>
+              </View>
+              <View style={[styles.todayCountPill, { backgroundColor: '#F59E0B' }]}>
+                <Text style={styles.todayCountPillText}>
+                  {filteredToday.length} {filteredToday.length === 1 ? 'Birthday' : 'Birthdays'}
+                </Text>
+              </View>
+            </View>
           </View>
 
           {filteredToday.map((item) => (
@@ -160,14 +427,120 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         </View>
       )}
 
-      {/* Upcoming Section Header */}
-      <View style={[styles.sectionHeaderRow, { marginTop: filteredToday.length > 0 ? 18 : 6 }]}>
-        <Text style={[styles.iosSectionTitle, { color: colors.textSecondary }]}>
-          UPCOMING
-        </Text>
-        <Text style={[styles.iosBadgeText, { color: colors.textMuted }]}>
-          {filteredUpcoming.length} upcoming
-        </Text>
+      {/* Class / Group Filters & Upcoming Header */}
+      <View style={styles.upcomingHeaderContainer}>
+        <View style={styles.sectionHeaderRow}>
+          <Text style={[styles.iosSectionTitle, { color: colors.textSecondary }]}>
+            {selectedDayOffset !== null
+              ? selectedDayOffset === 0
+                ? 'TODAY'
+                : selectedDayOffset === 1
+                ? 'TOMORROW'
+                : `IN ${selectedDayOffset} DAYS`
+              : 'UPCOMING'}
+          </Text>
+          <Text style={[styles.iosBadgeText, { color: colors.textMuted }]}>
+            {filteredUpcoming.length} {filteredUpcoming.length === 1 ? 'person' : 'people'}
+          </Text>
+        </View>
+
+        {/* Filter Chips */}
+        {availableClasses.length > 0 && selectedDayOffset === null ? (
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.classChipsScroll}
+          >
+            <TouchableOpacity
+              activeOpacity={0.7}
+              onPress={() => setSelectedFilter('all')}
+              style={[
+                styles.filterPill,
+                {
+                  backgroundColor:
+                    selectedFilter === 'all'
+                      ? colors.accent
+                      : isDark
+                      ? colors.surface
+                      : colors.surfaceSubtle,
+                },
+              ]}
+            >
+              <Text
+                style={[
+                  styles.filterPillText,
+                  { color: selectedFilter === 'all' ? '#FFFFFF' : colors.textSecondary },
+                ]}
+              >
+                All ({upcomingBirthdays.length})
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              activeOpacity={0.7}
+              onPress={() => setSelectedFilter('month')}
+              style={[
+                styles.filterPill,
+                {
+                  backgroundColor:
+                    selectedFilter === 'month'
+                      ? colors.accent
+                      : isDark
+                      ? colors.surface
+                      : colors.surfaceSubtle,
+                },
+              ]}
+            >
+              <Text
+                style={[
+                  styles.filterPillText,
+                  { color: selectedFilter === 'month' ? '#FFFFFF' : colors.textSecondary },
+                ]}
+              >
+                Next 30 Days ({thisMonthCount})
+              </Text>
+            </TouchableOpacity>
+
+            {availableClasses.map((cls) => {
+              const count = upcomingBirthdays.filter(
+                (b) => b.groupClass && b.groupClass.trim().toLowerCase() === cls.toLowerCase()
+              ).length;
+
+              return (
+                <TouchableOpacity
+                  key={cls}
+                  activeOpacity={0.7}
+                  onPress={() => setSelectedFilter(cls)}
+                  style={[
+                    styles.filterPill,
+                    {
+                      backgroundColor:
+                        selectedFilter.toLowerCase() === cls.toLowerCase()
+                          ? colors.accent
+                          : isDark
+                          ? colors.surface
+                          : colors.surfaceSubtle,
+                    },
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.filterPillText,
+                      {
+                        color:
+                          selectedFilter.toLowerCase() === cls.toLowerCase()
+                            ? '#FFFFFF'
+                            : colors.textSecondary,
+                      },
+                    ]}
+                  >
+                    {cls} ({count})
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
+        ) : null}
       </View>
     </View>
   );
@@ -192,13 +565,21 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         )}
         ListHeaderComponent={renderHeader}
         ListEmptyComponent={
-          filteredToday.length === 0 ? (
+          filteredToday.length === 0 && filteredUpcoming.length === 0 ? (
             <EmptyState
-              title={searchQuery ? 'No Results' : 'No Birthdays'}
+              title={
+                searchQuery
+                  ? 'No Results Found'
+                  : selectedDayOffset !== null
+                  ? 'No Birthdays on This Day'
+                  : 'No Birthdays Added'
+              }
               subtitle={
                 searchQuery
-                  ? `No contacts found matching "${searchQuery}".`
-                  : 'Tap + above to add your first birthday reminder.'
+                  ? `No records found matching "${searchQuery}".`
+                  : selectedDayOffset !== null
+                  ? 'Tap another day in the calendar ribbon above.'
+                  : 'Tap + above or import a Google Sheet / CSV to get started.'
               }
               onAction={onOpenAdd}
             />
@@ -233,7 +614,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
   },
   headerContainer: {
-    paddingBottom: 6,
+    paddingBottom: 4,
   },
   navBarRow: {
     flexDirection: 'row',
@@ -248,7 +629,7 @@ const styles = StyleSheet.create({
     marginBottom: 2,
   },
   largeTitle: {
-    fontSize: 34,
+    fontSize: 32,
     fontWeight: '700',
     letterSpacing: -0.8,
   },
@@ -271,14 +652,114 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#007AFF',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 3,
+  },
+  appleWidgetContainer: {
+    borderRadius: 20,
+    borderWidth: 1,
+    overflow: 'hidden',
+    marginBottom: 14,
+  },
+  widgetHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 14,
+    paddingTop: 12,
+    paddingBottom: 8,
+  },
+  widgetHeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  widgetMonthText: {
+    fontSize: 12,
+    fontWeight: '700',
+    letterSpacing: 0.6,
+  },
+  weekStripDays: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 8,
+    paddingBottom: 12,
+  },
+  dayColumn: {
+    flex: 1,
+    alignItems: 'center',
+    paddingVertical: 2,
+  },
+  dayNameLabel: {
+    fontSize: 11,
+    marginBottom: 6,
+    letterSpacing: 0.5,
+  },
+  dayNumCircle: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  dayNumText: {
+    fontSize: 15,
+  },
+  contextPeekBar: {
+    borderTopWidth: StyleSheet.hairlineWidth,
+    paddingHorizontal: 14,
+    paddingVertical: 9,
+  },
+  peekContentRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  peekMainText: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  peekSubText: {
+    fontSize: 12,
+    fontStyle: 'italic',
   },
   sectionBlock: {
-    marginBottom: 8,
+    marginBottom: 12,
+  },
+  todayCelebrationBanner: {
+    borderWidth: 1,
+    borderRadius: 14,
+    padding: 14,
+    marginBottom: 10,
+  },
+  todayBannerHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  todayBadgeTag: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  todayBadgeText: {
+    fontSize: 13,
+    fontWeight: '800',
+    letterSpacing: 0.6,
+    color: '#D97706',
+  },
+  todayCountPill: {
+    paddingHorizontal: 10,
+    paddingVertical: 3,
+    borderRadius: 12,
+  },
+  todayCountPillText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  upcomingHeaderContainer: {
+    marginTop: 4,
+    marginBottom: 6,
   },
   sectionHeaderRow: {
     flexDirection: 'row',
@@ -295,5 +776,20 @@ const styles = StyleSheet.create({
   iosBadgeText: {
     fontSize: 13,
     fontWeight: '500',
+  },
+  classChipsScroll: {
+    flexDirection: 'row',
+    gap: 8,
+    paddingHorizontal: 2,
+    paddingVertical: 2,
+  },
+  filterPill: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+  },
+  filterPillText: {
+    fontSize: 12,
+    fontWeight: '600',
   },
 });

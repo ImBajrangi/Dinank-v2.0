@@ -1,4 +1,11 @@
-export type RelationshipType = 'family' | 'friend' | 'work' | 'love' | 'other';
+export type BuiltInRelationshipType = 'student' | 'family' | 'friend' | 'work' | 'other';
+export type RelationshipType = string;
+
+export interface CustomCategory {
+  id: string;
+  name: string;
+  createdAt: string;
+}
 
 export type ReminderTiming = 'on_day' | 'day_before' | 'week_before';
 
@@ -15,7 +22,9 @@ export interface Birthday {
   name: string;
   birthDate: string; // 'YYYY-MM-DD'
   relationship: RelationshipType;
-  groupClass?: string; // Class / Group / Dept / Circle
+  groupClass?: string; // Class / Grade / Dept (e.g. "10th")
+  section?: string; // Section (e.g. "A", "B")
+  session?: string; // Academic Session / Batch (e.g. "2024-2025")
   rollNo?: string; // Roll No / ID
   phone?: string;
   parentPhone?: string;

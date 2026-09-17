@@ -26,11 +26,12 @@ import {
   GraduationCap,
   Users,
   ChevronRight,
+  Compass,
 } from 'lucide-react-native';
 import { CalculatedBirthday } from '../types/birthday';
 import { Avatar } from './Avatar';
 import { useBirthdays } from '../context/BirthdayContext';
-import { RELATIONSHIP_COLORS } from '../constants/theme';
+import { RELATIONSHIP_COLORS, getCategoryStyle } from '../constants/theme';
 import { NotificationService } from '../services/notifications';
 import { ActionService } from '../services/actions';
 
@@ -72,14 +73,7 @@ export const BirthdayDetailModal: React.FC<BirthdayDetailModalProps> = ({
           try {
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
           } catch (e) {}
-          Animated.timing(panY, {
-            toValue: 600,
-            duration: 180,
-            useNativeDriver: true,
-          }).start(() => {
-            panY.setValue(0);
-            onClose();
-          });
+          onClose();
         } else {
           Animated.spring(panY, {
             toValue: 0,
@@ -101,7 +95,7 @@ export const BirthdayDetailModal: React.FC<BirthdayDetailModalProps> = ({
 
   const [, birthMonthStr, birthDayStr] = birthday.birthDate.split('-').map(Number);
   const formattedFullDate = `${birthDayStr} ${MONTH_NAMES[birthMonthStr - 1]}`;
-  const relColor = RELATIONSHIP_COLORS[birthday.relationship] || RELATIONSHIP_COLORS.other;
+  const relColor = getCategoryStyle(birthday.relationship);
 
   const handleDelete = () => {
     try {
@@ -129,7 +123,7 @@ export const BirthdayDetailModal: React.FC<BirthdayDetailModalProps> = ({
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     } catch (e) {}
     await NotificationService.triggerImmediateSystemNotification(
-      `🎂 ${birthday.name}'s Birthday Reminder`,
+      `${birthday.name}'s Birthday Reminder`,
       `${birthday.name} is turning ${birthday.nextAge}. (Device Alarm Active)`
     );
   };
@@ -215,9 +209,9 @@ export const BirthdayDetailModal: React.FC<BirthdayDetailModalProps> = ({
                   ]}
                 >
                   {birthday.isToday
-                    ? 'Celebrating Today 🎂'
+                    ? 'Celebrating Today'
                     : birthday.isTomorrow
-                    ? 'Tomorrow 🎉'
+                    ? 'Tomorrow'
                     : `In ${birthday.daysUntil} days`}
                 </Text>
               </View>
@@ -241,10 +235,10 @@ export const BirthdayDetailModal: React.FC<BirthdayDetailModalProps> = ({
               <TouchableOpacity
                 activeOpacity={0.7}
                 onPress={() => {
-                  const msg = ActionService.formatStudentGreeting(
-                    settings.customStudentTemplate,
+                  const msg = ActionService.formatCategoryGreeting(
                     birthday,
-                    settings.senderName
+                    settings.senderName,
+                    birthday.relationship === 'student' ? settings.customStudentTemplate : undefined
                   );
                   ActionService.sendWhatsApp(birthday.phone, msg, birthday.name);
                 }}
@@ -260,10 +254,10 @@ export const BirthdayDetailModal: React.FC<BirthdayDetailModalProps> = ({
               <TouchableOpacity
                 activeOpacity={0.7}
                 onPress={() => {
-                  const msg = ActionService.formatStudentGreeting(
-                    settings.customStudentTemplate,
+                  const msg = ActionService.formatCategoryGreeting(
                     birthday,
-                    settings.senderName
+                    settings.senderName,
+                    birthday.relationship === 'student' ? settings.customStudentTemplate : undefined
                   );
                   ActionService.sendSMS(birthday.phone, msg, birthday.name);
                 }}
@@ -305,19 +299,19 @@ export const BirthdayDetailModal: React.FC<BirthdayDetailModalProps> = ({
               </View>
 
               <View style={[styles.metricCard, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}>
-                <Text style={[styles.metricZodiac, { color: colors.textPrimary }]}>
-                  {birthday.zodiacSign.split(' ')[1] || '⭐'}
-                </Text>
+                <Compass size={22} color={colors.accent} style={{ marginBottom: 4 }} />
                 <Text style={[styles.metricLbl, { color: colors.textSecondary }]}>
-                  {birthday.zodiacSign.split(' ')[0]}
+                  {birthday.zodiacSign}
                 </Text>
               </View>
             </View>
 
-            {/* Contact Information (Phone, Group/Class, Parent Phone, Email) */}
-            {(birthday.phone || birthday.groupClass || birthday.parentPhone || birthday.email) && (
+            {/* Contact & Student Information */}
+            {(birthday.phone || birthday.groupClass || birthday.section || birthday.session || birthday.rollNo || birthday.parentPhone || birthday.email) && (
               <>
-                <Text style={[styles.sectionHeader, { color: colors.textSecondary }]}>CONTACT INFO</Text>
+                <Text style={[styles.sectionHeader, { color: colors.textSecondary }]}>
+                  {birthday.relationship === 'student' ? 'STUDENT & CONTACT INFO' : 'CONTACT INFO'}
+                </Text>
                 <View style={[styles.groupedBox, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}>
                   {birthday.phone && (
                     <TouchableOpacity
@@ -333,15 +327,41 @@ export const BirthdayDetailModal: React.FC<BirthdayDetailModalProps> = ({
                     </TouchableOpacity>
                   )}
 
-                  {birthday.groupClass && (
+                  {(birthday.groupClass || birthday.section) && (
                     <>
                       {birthday.phone && <View style={[styles.separator, { backgroundColor: colors.surfaceBorder }]} />}
                       <View style={styles.infoRow}>
                         <View style={styles.infoLeft}>
-                          <Text style={[styles.infoTitle, { color: colors.textSecondary }]}>Class / Group</Text>
-                          <Text style={[styles.infoValue, { color: colors.textPrimary }]}>{birthday.groupClass}</Text>
+                          <Text style={[styles.infoTitle, { color: colors.textSecondary }]}>Class / Section</Text>
+                          <Text style={[styles.infoValue, { color: colors.textPrimary }]}>
+                            {[birthday.groupClass, birthday.section ? `Sec ${birthday.section}` : null].filter(Boolean).join(' - ')}
+                          </Text>
                         </View>
                         <GraduationCap size={16} color={colors.textSecondary} />
+                      </View>
+                    </>
+                  )}
+
+                  {birthday.session && (
+                    <>
+                      <View style={[styles.separator, { backgroundColor: colors.surfaceBorder }]} />
+                      <View style={styles.infoRow}>
+                        <View style={styles.infoLeft}>
+                          <Text style={[styles.infoTitle, { color: colors.textSecondary }]}>Academic Session / Batch</Text>
+                          <Text style={[styles.infoValue, { color: colors.textPrimary }]}>{birthday.session}</Text>
+                        </View>
+                      </View>
+                    </>
+                  )}
+
+                  {birthday.rollNo && (
+                    <>
+                      <View style={[styles.separator, { backgroundColor: colors.surfaceBorder }]} />
+                      <View style={styles.infoRow}>
+                        <View style={styles.infoLeft}>
+                          <Text style={[styles.infoTitle, { color: colors.textSecondary }]}>Roll No / Student ID</Text>
+                          <Text style={[styles.infoValue, { color: colors.textPrimary }]}>{birthday.rollNo}</Text>
+                        </View>
                       </View>
                     </>
                   )}
@@ -355,7 +375,7 @@ export const BirthdayDetailModal: React.FC<BirthdayDetailModalProps> = ({
                         style={styles.infoRow}
                       >
                         <View style={styles.infoLeft}>
-                          <Text style={[styles.infoTitle, { color: colors.textSecondary }]}>Parent Contact</Text>
+                          <Text style={[styles.infoTitle, { color: colors.textSecondary }]}>Parent Contact (Call)</Text>
                           <Text style={[styles.infoValue, { color: colors.accent }]}>{birthday.parentPhone}</Text>
                         </View>
                         <Users size={15} color={colors.accent} />
@@ -498,9 +518,9 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   sheet: {
-    borderTopLeftRadius: 12,
-    borderTopRightRadius: 12,
-    maxHeight: '92%',
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
+    height: '88%',
   },
   grabberWrapper: {
     alignItems: 'center',
@@ -539,6 +559,7 @@ const styles = StyleSheet.create({
     letterSpacing: -0.4,
   },
   body: {
+    flex: 1,
     paddingHorizontal: 16,
   },
   heroSection: {

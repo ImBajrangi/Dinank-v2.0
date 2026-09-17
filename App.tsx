@@ -154,7 +154,9 @@ import { SettingsScreen } from './src/screens/SettingsScreen';
 import { AddBirthdayModal } from './src/components/AddBirthdayModal';
 import { BirthdayDetailModal } from './src/components/BirthdayDetailModal';
 import { AIWishModal } from './src/components/AIWishModal';
+import { UpdateModal } from './src/components/UpdateModal';
 import { CalculatedBirthday, Birthday } from './src/types/birthday';
+import { AutoUpdateService, AppUpdateInfo } from './src/services/updater';
 
 type Tab = 'home' | 'calendar' | 'people' | 'settings';
 
@@ -169,6 +171,24 @@ const MainApp: React.FC = () => {
 
   const [selectedBirthday, setSelectedBirthday] = useState<CalculatedBirthday | null>(null);
   const [aiWishBirthday, setAiWishBirthday] = useState<CalculatedBirthday | null>(null);
+
+  // Auto-Update states
+  const [updateInfo, setUpdateInfo] = useState<AppUpdateInfo | null>(null);
+  const [isUpdateModalOpen, setIsUpdateModalOpen] = useState(false);
+
+  React.useEffect(() => {
+    // Check for updates quietly after app loads
+    const timer = setTimeout(async () => {
+      try {
+        const info = await AutoUpdateService.checkForUpdates();
+        if (info.hasUpdate) {
+          setUpdateInfo(info);
+          setIsUpdateModalOpen(true);
+        }
+      } catch (e) {}
+    }, 2000);
+    return () => clearTimeout(timer);
+  }, []);
 
   const handleOpenAdd = () => {
     try {
@@ -358,6 +378,13 @@ const MainApp: React.FC = () => {
         visible={aiWishBirthday !== null}
         onClose={() => setAiWishBirthday(null)}
         birthday={aiWishBirthday}
+      />
+
+      {/* Auto-Update Modal */}
+      <UpdateModal
+        visible={isUpdateModalOpen}
+        updateInfo={updateInfo}
+        onClose={() => setIsUpdateModalOpen(false)}
       />
     </View>
   );

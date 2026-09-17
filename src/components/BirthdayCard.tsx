@@ -5,7 +5,7 @@ import * as Haptics from 'expo-haptics';
 import { CalculatedBirthday } from '../types/birthday';
 import { Avatar } from './Avatar';
 import { useBirthdays } from '../context/BirthdayContext';
-import { RELATIONSHIP_COLORS } from '../constants/theme';
+import { RELATIONSHIP_COLORS, getCategoryStyle } from '../constants/theme';
 
 interface BirthdayCardProps {
   birthday: CalculatedBirthday;
@@ -27,7 +27,7 @@ export const BirthdayCard: React.FC<BirthdayCardProps> = React.memo(({
   const [, birthMonthStr, birthDayStr] = birthday.birthDate.split('-').map(Number);
   const formattedDate = `${MONTH_NAMES[birthMonthStr - 1]} ${birthDayStr}`;
 
-  const relColor = RELATIONSHIP_COLORS[birthday.relationship] || RELATIONSHIP_COLORS.other;
+  const relColor = getCategoryStyle(birthday.relationship);
 
   // Apple-style status badge
   const getBadge = () => {
@@ -97,7 +97,11 @@ export const BirthdayCard: React.FC<BirthdayCardProps> = React.memo(({
           </View>
 
           <Text numberOfLines={1} style={[styles.metaText, { color: colors.textSecondary }]}>
-            {formattedDate} • Turns {birthday.nextAge}{birthday.groupClass ? ` • ${birthday.groupClass}` : ''}
+            {formattedDate}
+            {birthday.nextAge > 0 && birthday.nextAge <= 120 ? ` • Turns ${birthday.nextAge}` : ''}
+            {birthday.groupClass ? ` • ${birthday.groupClass}` : ''}
+            {birthday.section ? ` (${birthday.section})` : ''}
+            {birthday.session ? ` • ${birthday.session}` : ''}
           </Text>
         </View>
 

@@ -7,15 +7,18 @@ import {
   ScrollView,
   StyleSheet,
   Share,
-  Linking,
   Animated,
   PanResponder,
+  Platform,
+  TextInput,
+  ActivityIndicator,
 } from 'react-native';
 import * as Haptics from 'expo-haptics';
-import { Sparkles, Copy, Send, RefreshCw, Check } from 'lucide-react-native';
+import { Sparkles, Copy, Send, RefreshCw, Check, SlidersHorizontal, ChevronDown, ChevronUp } from 'lucide-react-native';
 import { CalculatedBirthday } from '../types/birthday';
 import { useBirthdays } from '../context/BirthdayContext';
-import { WishTone, generateLocalWish } from '../services/aiWishes';
+import { WishTone, generateAIWish, generateLocalWish } from '../services/aiWishes';
+import { ActionService } from '../services/actions';
 
 interface AIWishModalProps {
   visible: boolean;
@@ -31,32 +34,63 @@ const TONES: { id: WishTone; label: string }[] = [
   { id: 'formal', label: 'Formal' },
 ];
 
+const SUGGESTIONS = [
+  'In Hindi / Hinglish',
+  'Add Shayari',
+  'Academic blessing',
+  'Fun & playful',
+];
+
 export const AIWishModal: React.FC<AIWishModalProps> = ({
   visible,
   onClose,
   birthday,
 }) => {
-  const { colors, isDark } = useBirthdays();
+  const { colors, isDark, settings } = useBirthdays();
   const [selectedTone, setSelectedTone] = useState<WishTone>('heartfelt');
+  const [customPrompt, setCustomPrompt] = useState('');
+  const [showCustomPrompt, setShowCustomPrompt] = useState(false);
+  const [isGenerating, setIsGenerating] = useState(false);
   const [copied, setCopied] = useState(false);
   const [currentWish, setCurrentWish] = useState<string>('');
 
-  React.useEffect(() => {
+  useEffect(() => {
     if (birthday && visible) {
-      regenerate(selectedTone);
+      setCustomPrompt('');
+      setShowCustomPrompt(false);
+      regenerate(selectedTone, '');
     }
   }, [birthday, visible]);
 
-  const regenerate = (tone: WishTone) => {
+  const regenerate = async (tone: WishTone, promptOverride?: string) => {
     if (!birthday) return;
-    const generated = generateLocalWish({
-      name: birthday.name,
-      relationship: birthday.relationship,
-      tone,
-      turningAge: birthday.nextAge,
-    });
-    setCurrentWish(generated);
-    setCopied(false);
+    setIsGenerating(true);
+    const promptToUse = promptOverride !== undefined ? promptOverride : customPrompt;
+    try {
+      const generated = await generateAIWish({
+        name: birthday.name,
+        relationship: birthday.relationship,
+        tone,
+        turningAge: birthday.nextAge,
+        groupClass: birthday.groupClass,
+        section: birthday.section,
+        session: birthday.session,
+        senderName: settings.senderName,
+        customPrompt: promptToUse,
+      });
+      setCurrentWish(generated);
+    } catch (e) {
+      const fallback = generateLocalWish({
+        name: birthday.name,
+        relationship: birthday.relationship,
+        tone,
+        turningAge: birthday.nextAge,
+      });
+      setCurrentWish(fallback);
+    } finally {
+      setIsGenerating(false);
+      setCopied(false);
+    }
   };
 
   const handleToneChange = (tone: WishTone) => {
@@ -65,6 +99,14 @@ export const AIWishModal: React.FC<AIWishModalProps> = ({
     } catch (e) {}
     setSelectedTone(tone);
     regenerate(tone);
+  };
+
+  const handleApplySuggestion = (sug: string) => {
+    try {
+      Haptics.selectionAsync();
+    } catch (e) {}
+    setCustomPrompt(sug);
+    regenerate(selectedTone, sug);
   };
 
   const handleCopy = () => {
@@ -78,16 +120,7 @@ export const AIWishModal: React.FC<AIWishModalProps> = ({
 
   const handleWhatsApp = async () => {
     if (!currentWish) return;
-    try {
-      Haptics.selectionAsync();
-    } catch (e) {}
-    const url = `whatsapp://send?text=${encodeURIComponent(currentWish)}`;
-    const canOpen = await Linking.canOpenURL(url).catch(() => false);
-    if (canOpen) {
-      await Linking.openURL(url);
-    } else {
-      Share.share({ message: currentWish });
-    }
+    await ActionService.sendWhatsApp(birthday?.phone, currentWish, birthday?.name);
   };
 
   const handleShare = async () => {
@@ -116,14 +149,7 @@ export const AIWishModal: React.FC<AIWishModalProps> = ({
           try {
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
           } catch (e) {}
-          Animated.timing(panY, {
-            toValue: 600,
-            duration: 180,
-            useNativeDriver: true,
-          }).start(() => {
-            panY.setValue(0);
-            onClose();
-          });
+          onClose();
         } else {
           Animated.spring(panY, {
             toValue: 0,
@@ -144,7 +170,7 @@ export const AIWishModal: React.FC<AIWishModalProps> = ({
   if (!birthday) return null;
 
   return (
-    <Modal visible={visible} animationType="slide" transparent>
+    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
       <View style={styles.backdrop}>
         <TouchableOpacity
           style={StyleSheet.absoluteFill}
@@ -167,23 +193,25 @@ export const AIWishModal: React.FC<AIWishModalProps> = ({
 
           {/* Navigation Bar */}
           <View {...panResponder.panHandlers} style={styles.navHeader}>
-            <View style={{ width: 60 }} />
-            <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>
-              Wish Composer
-            </Text>
+            <View style={styles.headerLeft}>
+              <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>
+                Birthday Wish
+              </Text>
+              <Text style={[styles.headerSub, { color: colors.textSecondary }]}>
+                {birthday.name} {birthday.nextAge ? `• Turning ${birthday.nextAge}` : ''}
+              </Text>
+            </View>
             <TouchableOpacity activeOpacity={0.7} onPress={onClose} style={styles.doneBtn}>
               <Text style={[styles.doneText, { color: colors.accent }]}>Done</Text>
             </TouchableOpacity>
           </View>
 
           <ScrollView style={styles.body} showsVerticalScrollIndicator={false}>
-            {/* Tone Selector */}
-            <Text style={[styles.sectionHeader, { color: colors.textSecondary }]}>TONE</Text>
-            <View
-              style={[
-                styles.segmentedControl,
-                { backgroundColor: isDark ? '#2C2C2E' : '#E5E5EA' },
-              ]}
+            {/* Tone Selector Pills */}
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.toneScroll}
             >
               {TONES.map((t) => {
                 const isSelected = selectedTone === t.id;
@@ -193,22 +221,21 @@ export const AIWishModal: React.FC<AIWishModalProps> = ({
                     activeOpacity={0.7}
                     onPress={() => handleToneChange(t.id)}
                     style={[
-                      styles.segmentBtn,
-                      isSelected && {
-                        backgroundColor: isDark ? '#3A3A3C' : '#FFFFFF',
-                        shadowColor: '#000',
-                        shadowOffset: { width: 0, height: 1 },
-                        shadowOpacity: 0.15,
-                        shadowRadius: 2,
-                        elevation: 2,
+                      styles.tonePill,
+                      {
+                        backgroundColor: isSelected
+                          ? colors.accent
+                          : isDark
+                          ? '#2C2C2E'
+                          : '#E5E5EA',
                       },
                     ]}
                   >
                     <Text
                       style={[
-                        styles.segmentText,
+                        styles.tonePillText,
                         {
-                          color: isSelected ? colors.textPrimary : colors.textSecondary,
+                          color: isSelected ? '#FFFFFF' : colors.textPrimary,
                           fontWeight: isSelected ? '600' : '400',
                         },
                       ]}
@@ -218,35 +245,120 @@ export const AIWishModal: React.FC<AIWishModalProps> = ({
                   </TouchableOpacity>
                 );
               })}
-            </View>
+            </ScrollView>
 
-            {/* Inset Grouped Generated Message Card */}
-            <Text style={[styles.sectionHeader, { color: colors.textSecondary }]}>PREVIEW</Text>
-            <View style={[styles.groupedBox, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}>
-              <Text style={[styles.wishText, { color: colors.textPrimary }]}>
-                {currentWish}
-              </Text>
+            {/* Hero Message Card */}
+            <View style={[styles.wishCard, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}>
+              {isGenerating ? (
+                <View style={styles.loadingContainer}>
+                  <ActivityIndicator size="small" color={colors.accent} />
+                  <Text style={[styles.loadingText, { color: colors.textSecondary }]}>
+                    Writing heartfelt wish...
+                  </Text>
+                </View>
+              ) : (
+                <TextInput
+                  style={[
+                    styles.wishInput,
+                    { color: colors.textPrimary },
+                    Platform.OS === 'web' ? ({ outlineStyle: 'none', outline: 'none' } as any) : {},
+                  ]}
+                  value={currentWish}
+                  onChangeText={setCurrentWish}
+                  multiline
+                  placeholder="Your birthday message will appear here..."
+                  placeholderTextColor={colors.textSecondary}
+                />
+              )}
 
               <View style={[styles.divider, { backgroundColor: colors.surfaceBorder }]} />
 
-              <TouchableOpacity
-                activeOpacity={0.65}
-                onPress={() => {
-                  try {
-                    Haptics.selectionAsync();
-                  } catch (e) {}
-                  regenerate(selectedTone);
-                }}
-                style={styles.regenRow}
-              >
-                <RefreshCw size={14} color={colors.accent} style={{ marginRight: 6 }} />
-                <Text style={[styles.regenText, { color: colors.accent }]}>
-                  Generate Another Variation
-                </Text>
-              </TouchableOpacity>
+              {/* Bottom Card Bar: Regenerate & Optional Custom Prompt Toggle */}
+              <View style={styles.cardFooter}>
+                <TouchableOpacity
+                  activeOpacity={0.65}
+                  disabled={isGenerating}
+                  onPress={() => {
+                    try {
+                      Haptics.selectionAsync();
+                    } catch (e) {}
+                    regenerate(selectedTone);
+                  }}
+                  style={styles.regenBtn}
+                >
+                  <RefreshCw size={13} color={colors.accent} style={{ marginRight: 5 }} />
+                  <Text style={[styles.regenBtnText, { color: colors.accent }]}>
+                    Regenerate
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  activeOpacity={0.65}
+                  onPress={() => setShowCustomPrompt(!showCustomPrompt)}
+                  style={styles.customToggleBtn}
+                >
+                  <Sparkles size={13} color={colors.textSecondary} style={{ marginRight: 4 }} />
+                  <Text style={[styles.customToggleText, { color: colors.textSecondary }]}>
+                    {showCustomPrompt ? 'Hide instructions' : 'Add custom prompt'}
+                  </Text>
+                  {showCustomPrompt ? (
+                    <ChevronUp size={13} color={colors.textSecondary} />
+                  ) : (
+                    <ChevronDown size={13} color={colors.textSecondary} />
+                  )}
+                </TouchableOpacity>
+              </View>
             </View>
 
-            {/* Apple Actions */}
+            {/* Collapsed/Expanded Custom Prompt Box */}
+            {showCustomPrompt && (
+              <View style={[styles.customPromptCard, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}>
+                <TextInput
+                  style={[
+                    styles.promptInput,
+                    { color: colors.textPrimary },
+                    Platform.OS === 'web' ? ({ outlineStyle: 'none', outline: 'none' } as any) : {},
+                  ]}
+                  placeholder="e.g. In Hindi, add blessing for exams..."
+                  placeholderTextColor={colors.textSecondary}
+                  value={customPrompt}
+                  onChangeText={setCustomPrompt}
+                />
+
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRow}>
+                  {SUGGESTIONS.map((sug) => (
+                    <TouchableOpacity
+                      key={sug}
+                      activeOpacity={0.7}
+                      onPress={() => handleApplySuggestion(sug)}
+                      style={[
+                        styles.sugChip,
+                        {
+                          backgroundColor: customPrompt === sug ? colors.accentLight : isDark ? '#2C2C2E' : '#E5E5EA',
+                          borderColor: customPrompt === sug ? colors.accent : 'transparent',
+                        },
+                      ]}
+                    >
+                      <Text style={[styles.sugText, { color: customPrompt === sug ? colors.accent : colors.textPrimary }]}>
+                        {sug}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+
+                <TouchableOpacity
+                  activeOpacity={0.75}
+                  disabled={isGenerating}
+                  onPress={() => regenerate(selectedTone)}
+                  style={[styles.applyPromptBtn, { backgroundColor: colors.accent }]}
+                >
+                  <Sparkles size={14} color="#FFFFFF" style={{ marginRight: 5 }} />
+                  <Text style={styles.applyPromptText}>Generate with instructions</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+
+            {/* Apple Action Buttons */}
             <View style={styles.actionsBox}>
               <TouchableOpacity
                 activeOpacity={0.8}
@@ -254,10 +366,25 @@ export const AIWishModal: React.FC<AIWishModalProps> = ({
                 style={[styles.primaryBtn, { backgroundColor: '#34C759' }]}
               >
                 <Send size={16} color="#FFFFFF" style={{ marginRight: 8 }} />
-                <Text style={styles.primaryBtnText}>Send via WhatsApp</Text>
+                <Text style={styles.primaryBtnText}>Send on WhatsApp</Text>
               </TouchableOpacity>
 
               <View style={styles.dualRow}>
+                <TouchableOpacity
+                  activeOpacity={0.7}
+                  onPress={handleCopy}
+                  style={[styles.secBtn, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}
+                >
+                  {copied ? (
+                    <Check size={16} color={colors.success} style={{ marginRight: 6 }} />
+                  ) : (
+                    <Copy size={16} color={colors.textSecondary} style={{ marginRight: 6 }} />
+                  )}
+                  <Text style={[styles.secBtnText, { color: copied ? colors.success : colors.textPrimary }]}>
+                    {copied ? 'Copied to Clipboard' : 'Copy'}
+                  </Text>
+                </TouchableOpacity>
+
                 <TouchableOpacity
                   activeOpacity={0.7}
                   onPress={handleShare}
@@ -265,25 +392,10 @@ export const AIWishModal: React.FC<AIWishModalProps> = ({
                 >
                   <Text style={[styles.secBtnText, { color: colors.textPrimary }]}>Share...</Text>
                 </TouchableOpacity>
-
-                <TouchableOpacity
-                  activeOpacity={0.7}
-                  onPress={handleCopy}
-                  style={[styles.secBtn, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}
-                >
-                  {copied ? (
-                    <Check size={16} color={colors.success} style={{ marginRight: 4 }} />
-                  ) : (
-                    <Copy size={16} color={colors.textSecondary} style={{ marginRight: 4 }} />
-                  )}
-                  <Text style={[styles.secBtnText, { color: copied ? colors.success : colors.textPrimary }]}>
-                    {copied ? 'Copied' : 'Copy'}
-                  </Text>
-                </TouchableOpacity>
               </View>
             </View>
 
-            <View style={{ height: 36 }} />
+            <View style={{ height: 40 }} />
           </ScrollView>
         </Animated.View>
       </View>
@@ -298,9 +410,9 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   sheet: {
-    borderTopLeftRadius: 12,
-    borderTopRightRadius: 12,
-    maxHeight: '88%',
+    borderTopLeftRadius: 18,
+    borderTopRightRadius: 18,
+    maxHeight: '90%',
   },
   grabberWrapper: {
     alignItems: 'center',
@@ -317,17 +429,24 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
-    paddingVertical: 10,
+    paddingTop: 6,
+    paddingBottom: 10,
+  },
+  headerLeft: {
+    flex: 1,
   },
   headerTitle: {
-    fontSize: 17,
-    fontWeight: '600',
+    fontSize: 18,
+    fontWeight: '700',
     letterSpacing: -0.4,
+  },
+  headerSub: {
+    fontSize: 13,
+    marginTop: 1,
   },
   doneBtn: {
     paddingVertical: 4,
-    width: 60,
-    alignItems: 'flex-end',
+    paddingLeft: 12,
   },
   doneText: {
     fontSize: 17,
@@ -335,60 +454,111 @@ const styles = StyleSheet.create({
     letterSpacing: -0.4,
   },
   body: {
+    flex: 1,
     paddingHorizontal: 16,
   },
-  sectionHeader: {
-    fontSize: 12,
-    fontWeight: '600',
-    letterSpacing: 0.6,
-    marginTop: 14,
-    marginBottom: 6,
-    paddingHorizontal: 4,
-  },
-  segmentedControl: {
+  toneScroll: {
     flexDirection: 'row',
-    borderRadius: 9,
-    padding: 2,
-    marginBottom: 10,
+    gap: 8,
+    paddingVertical: 10,
   },
-  segmentBtn: {
-    flex: 1,
-    paddingVertical: 6,
-    borderRadius: 7,
-    alignItems: 'center',
-    justifyContent: 'center',
+  tonePill: {
+    paddingHorizontal: 15,
+    paddingVertical: 7,
+    borderRadius: 16,
   },
-  segmentText: {
+  tonePillText: {
     fontSize: 13,
-    letterSpacing: -0.2,
   },
-  groupedBox: {
-    borderRadius: 12,
+  wishCard: {
+    borderRadius: 14,
     borderWidth: 0.5,
     overflow: 'hidden',
+    marginTop: 4,
   },
-  wishText: {
+  loadingContainer: {
+    padding: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+  },
+  loadingText: {
+    fontSize: 14,
+  },
+  wishInput: {
     padding: 16,
-    fontSize: 16,
+    fontSize: 15,
     lineHeight: 23,
-    fontWeight: '400',
-    letterSpacing: -0.3,
+    minHeight: 120,
+    textAlignVertical: 'top',
   },
   divider: {
     height: 0.5,
   },
-  regenRow: {
+  cardFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+  },
+  regenBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 4,
+  },
+  regenBtnText: {
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  customToggleBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 4,
+    gap: 2,
+  },
+  customToggleText: {
+    fontSize: 13,
+  },
+  customPromptCard: {
+    borderRadius: 14,
+    borderWidth: 0.5,
+    padding: 12,
+    marginTop: 10,
+    gap: 10,
+  },
+  promptInput: {
+    fontSize: 14,
+    paddingVertical: 4,
+  },
+  chipRow: {
+    flexDirection: 'row',
+    gap: 6,
+  },
+  sugChip: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 12,
+    borderWidth: 0.5,
+  },
+  sugText: {
+    fontSize: 12,
+    fontWeight: '500',
+  },
+  applyPromptBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
   },
-  regenText: {
-    fontSize: 14,
-    fontWeight: '500',
+  applyPromptText: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '600',
   },
   actionsBox: {
-    marginTop: 20,
+    marginTop: 16,
     gap: 10,
   },
   primaryBtn: {

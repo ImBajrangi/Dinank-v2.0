@@ -3,7 +3,9 @@ import { useColorScheme } from 'react-native';
 import { Birthday, CalculatedBirthday, UserSettings, ThemePreference } from '../types/birthday';
 import { cache } from '../services/cache';
 import { NotificationService } from '../services/notifications';
+import { SoundService } from '../services/sound';
 import { calculateBirthdayDetails, getInitialSeedBirthdays, sortBirthdaysUpcoming } from '../services/birthdays';
+import { SourcesService, SavedSource } from '../services/sources';
 import { PALETTES } from '../constants/theme';
 
 interface BirthdayContextType {
@@ -11,12 +13,23 @@ interface BirthdayContextType {
   calculatedBirthdays: CalculatedBirthday[];
   todayBirthdays: CalculatedBirthday[];
   upcomingBirthdays: CalculatedBirthday[];
+  savedSources: SavedSource[];
+  customCategories: string[];
   settings: UserSettings;
   themePreference: ThemePreference;
   isDark: boolean;
   colors: typeof PALETTES['dark'];
   loading: boolean;
   addBirthday: (birthday: Omit<Birthday, 'id' | 'createdAt' | 'updatedAt'>) => Promise<Birthday>;
+  addMultipleBirthdays: (
+    items: Omit<Birthday, 'id' | 'createdAt' | 'updatedAt'>[],
+    sourceMeta?: { name: string; type: 'sheet' | 'file'; urlOrUri: string }
+  ) => Promise<number>;
+  cleanDuplicateBirthdays: () => Promise<number>;
+  deleteSourceAndContacts: (sourceId: string, sourceName: string, deleteContacts: boolean) => Promise<void>;
+  refreshSavedSources: () => Promise<void>;
+  addCustomCategory: (name: string) => Promise<string>;
+  deleteCustomCategory: (name: string) => Promise<void>;
   updateBirthday: (birthday: Birthday) => Promise<void>;
   deleteBirthday: (id: string) => Promise<void>;
   setThemePreference: (theme: ThemePreference) => void;
@@ -27,6 +40,7 @@ interface BirthdayContextType {
 
 const STORAGE_KEY_BIRTHDAYS = '@birthdays_v1';
 const STORAGE_KEY_SETTINGS = '@settings_v1';
+const STORAGE_KEY_CUSTOM_CATEGORIES = '@custom_categories_v1';
 
 const DEFAULT_SETTINGS: UserSettings = {
   theme: 'dark',
@@ -44,6 +58,8 @@ export const BirthdayProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const systemColorScheme = useColorScheme();
   const [loading, setLoading] = useState(true);
   const [birthdays, setBirthdays] = useState<Birthday[]>([]);
+  const [savedSources, setSavedSources] = useState<SavedSource[]>([]);
+  const [customCategories, setCustomCategories] = useState<string[]>([]);
   const [settings, setSettings] = useState<UserSettings>(DEFAULT_SETTINGS);
 
   // Initialize and hydrate cache on startup
@@ -54,24 +70,36 @@ export const BirthdayProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       try {
         await NotificationService.init();
 
-        const cachedBirthdays = await cache.hydrate<Birthday[]>(
-          STORAGE_KEY_BIRTHDAYS,
-          getInitialSeedBirthdays()
-        );
-        const cachedSettings = await cache.hydrate<UserSettings>(
-          STORAGE_KEY_SETTINGS,
-          DEFAULT_SETTINGS
-        );
+        const [cachedBirthdays, cachedSettings, cachedSources, cachedCustomCats] = await Promise.all([
+          cache.hydrate<Birthday[]>(STORAGE_KEY_BIRTHDAYS, getInitialSeedBirthdays()),
+          cache.hydrate<UserSettings>(STORAGE_KEY_SETTINGS, DEFAULT_SETTINGS),
+          SourcesService.getSavedSources(),
+          cache.hydrate<string[]>(STORAGE_KEY_CUSTOM_CATEGORIES, []),
+        ]);
+
+        // Auto-discover any custom category present in stored contacts
+        const standardCats = new Set(['student', 'family', 'friend', 'work', 'other']);
+        const mergedCustomCatsSet = new Set(cachedCustomCats || []);
+        cachedBirthdays.forEach((b) => {
+          if (b.relationship && !standardCats.has(b.relationship.toLowerCase().trim())) {
+            mergedCustomCatsSet.add(b.relationship.trim());
+          }
+        });
+        const mergedCustomCats = Array.from(mergedCustomCatsSet);
 
         if (isMounted) {
           setBirthdays(cachedBirthdays);
           setSettings(cachedSettings);
+          setSavedSources(cachedSources);
+          setCustomCategories(mergedCustomCats);
           setLoading(false);
         }
 
-        // Ensure system notifications are scheduled for existing birthdays
-        for (const b of cachedBirthdays) {
-          await NotificationService.scheduleBirthdayReminders(b);
+        // Schedule system notifications for nearest upcoming birthdays in background
+        const sorted = sortBirthdaysUpcoming(cachedBirthdays);
+        const topUpcoming = sorted.slice(0, 30);
+        for (const b of topUpcoming) {
+          NotificationService.scheduleBirthdayReminders(b).catch(() => {});
         }
       } catch (err) {
         console.warn('[BirthdayContext] Load error:', err);
@@ -126,12 +154,115 @@ export const BirthdayProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       setBirthdays(updated);
       cache.set(STORAGE_KEY_BIRTHDAYS, updated);
 
-      // Schedule system notifications directly to device OS
-      await NotificationService.scheduleBirthdayReminders(newBirthday);
+      // Non-blocking background notification scheduling (instant UI save)
+      NotificationService.scheduleBirthdayReminders(newBirthday).catch(() => {});
 
       return newBirthday;
     },
     [birthdays]
+  );
+
+  const refreshSavedSources = useCallback(async () => {
+    const sources = await SourcesService.getSavedSources();
+    setSavedSources(sources);
+  }, []);
+
+  const addMultipleBirthdays = useCallback(
+    async (
+      items: Omit<Birthday, 'id' | 'createdAt' | 'updatedAt'>[],
+      sourceMeta?: { name: string; type: 'sheet' | 'file'; urlOrUri: string }
+    ): Promise<number> => {
+      if (!items || items.length === 0) return 0;
+
+      const now = new Date().toISOString();
+      const existingKeys = new Set(
+        birthdays.map((b) => `${b.name.trim().toLowerCase()}|${b.birthDate}|${b.rollNo || ''}`)
+      );
+
+      const newBirthdays: Birthday[] = [];
+      for (const item of items) {
+        const key = `${item.name.trim().toLowerCase()}|${item.birthDate}|${item.rollNo || ''}`;
+        if (!existingKeys.has(key)) {
+          existingKeys.add(key);
+          newBirthdays.push({
+            ...item,
+            id: 'bday_' + Date.now() + '_' + Math.random().toString(36).substring(2, 9),
+            createdAt: now,
+            updatedAt: now,
+          });
+        }
+      }
+
+      if (sourceMeta) {
+        SourcesService.saveSource({
+          id: 'src_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7),
+          name: sourceMeta.name,
+          type: sourceMeta.type,
+          urlOrUri: sourceMeta.urlOrUri,
+          importedCount: newBirthdays.length > 0 ? newBirthdays.length : items.length,
+          lastSyncedAt: now,
+          createdAt: now,
+        }).then(() => refreshSavedSources()).catch(() => {});
+      }
+
+      if (newBirthdays.length === 0) return 0;
+
+      const updated = [...newBirthdays, ...birthdays];
+      setBirthdays(updated);
+      cache.set(STORAGE_KEY_BIRTHDAYS, updated);
+
+      // Schedule system notifications in background for the top 30 nearest birthdays
+      const sorted = sortBirthdaysUpcoming(updated);
+      const topUpcoming = sorted.slice(0, 30);
+      for (const b of topUpcoming) {
+        NotificationService.scheduleBirthdayReminders(b).catch(() => {});
+      }
+
+      return newBirthdays.length;
+    },
+    [birthdays, refreshSavedSources]
+  );
+
+  const cleanDuplicateBirthdays = useCallback(async (): Promise<number> => {
+    const seen = new Set<string>();
+    const deduplicated: Birthday[] = [];
+    let duplicateCount = 0;
+
+    for (const b of birthdays) {
+      const key = `${b.name.trim().toLowerCase()}|${b.birthDate}|${b.rollNo || ''}`;
+      if (!seen.has(key)) {
+        seen.add(key);
+        deduplicated.push(b);
+      } else {
+        duplicateCount++;
+      }
+    }
+
+    if (duplicateCount > 0) {
+      setBirthdays(deduplicated);
+      cache.set(STORAGE_KEY_BIRTHDAYS, deduplicated);
+    }
+
+    return duplicateCount;
+  }, [birthdays]);
+
+  const deleteSourceAndContacts = useCallback(
+    async (sourceId: string, sourceName: string, deleteContacts: boolean) => {
+      await SourcesService.deleteSource(sourceId);
+      await refreshSavedSources();
+
+      if (deleteContacts) {
+        const cleanSourceName = sourceName.trim().toLowerCase();
+        const updated = birthdays.filter((b) => {
+          const bNotes = (b.notes || '').toLowerCase();
+          const bGroup = (b.groupClass || '').toLowerCase();
+          return !bNotes.includes(cleanSourceName) && !bGroup.includes(cleanSourceName);
+        });
+        setBirthdays(updated);
+        cache.set(STORAGE_KEY_BIRTHDAYS, updated);
+      }
+    },
+    [birthdays, refreshSavedSources]
   );
 
   const updateBirthday = useCallback(
@@ -143,8 +274,8 @@ export const BirthdayProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       setBirthdays(updated);
       cache.set(STORAGE_KEY_BIRTHDAYS, updated);
 
-      // Re-schedule system notification with new dates/times
-      await NotificationService.scheduleBirthdayReminders(patched);
+      // Non-blocking background notification re-scheduling
+      NotificationService.scheduleBirthdayReminders(patched).catch(() => {});
     },
     [birthdays]
   );
@@ -153,7 +284,7 @@ export const BirthdayProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     async (id: string): Promise<void> => {
       const target = birthdays.find((b) => b.id === id);
       if (target) {
-        await NotificationService.cancelBirthdayReminders(target);
+        NotificationService.cancelBirthdayReminders(target).catch(() => {});
       }
 
       const updated = birthdays.filter((b) => b.id !== id);
@@ -161,6 +292,41 @@ export const BirthdayProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       cache.set(STORAGE_KEY_BIRTHDAYS, updated);
     },
     [birthdays]
+  );
+
+  const addCustomCategory = useCallback(
+    async (name: string): Promise<string> => {
+      const trimmed = name.trim();
+      if (!trimmed) return '';
+      
+      const standardCats = ['student', 'family', 'friend', 'work', 'other'];
+      if (standardCats.includes(trimmed.toLowerCase())) {
+        return trimmed.toLowerCase();
+      }
+
+      setCustomCategories((prev) => {
+        if (prev.some((c) => c.toLowerCase() === trimmed.toLowerCase())) {
+          return prev;
+        }
+        const updated = [...prev, trimmed];
+        cache.set(STORAGE_KEY_CUSTOM_CATEGORIES, updated);
+        return updated;
+      });
+
+      return trimmed;
+    },
+    []
+  );
+
+  const deleteCustomCategory = useCallback(
+    async (name: string): Promise<void> => {
+      setCustomCategories((prev) => {
+        const updated = prev.filter((c) => c.toLowerCase() !== name.toLowerCase().trim());
+        cache.set(STORAGE_KEY_CUSTOM_CATEGORIES, updated);
+        return updated;
+      });
+    },
+    []
   );
 
   const setThemePreference = useCallback((theme: ThemePreference) => {
@@ -180,11 +346,12 @@ export const BirthdayProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   }, []);
 
   const triggerSystemNotificationTest = useCallback(async (): Promise<boolean> => {
+    SoundService.playSound(settings.notificationSound || 'default');
     return await NotificationService.triggerImmediateSystemNotification(
-      '🎂 Birthday Reminder Test',
+      'Birthday Reminder Test',
       'System local notification is active and working directly on your device!'
     );
-  }, []);
+  }, [settings.notificationSound]);
 
   const refreshNotifications = useCallback(async (): Promise<void> => {
     for (const b of birthdays) {
@@ -199,12 +366,20 @@ export const BirthdayProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         calculatedBirthdays,
         todayBirthdays,
         upcomingBirthdays,
+        savedSources,
+        customCategories,
         settings,
         themePreference: settings.theme,
         isDark,
         colors,
         loading,
         addBirthday,
+        addMultipleBirthdays,
+        cleanDuplicateBirthdays,
+        deleteSourceAndContacts,
+        refreshSavedSources,
+        addCustomCategory,
+        deleteCustomCategory,
         updateBirthday,
         deleteBirthday,
         setThemePreference,

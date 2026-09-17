@@ -2,19 +2,19 @@ import { Birthday, CalculatedBirthday, RelationshipType } from '../types/birthda
 
 export function getZodiacSign(month: number, day: number): string {
   const signs = [
-    { name: 'Capricorn ♑', end: [1, 19] },
-    { name: 'Aquarius ♒', end: [2, 18] },
-    { name: 'Pisces ♓', end: [3, 20] },
-    { name: 'Aries ♈', end: [4, 19] },
-    { name: 'Taurus ♉', end: [5, 20] },
-    { name: 'Gemini ♊', end: [6, 20] },
-    { name: 'Cancer ♋', end: [7, 22] },
-    { name: 'Leo ♌', end: [8, 22] },
-    { name: 'Virgo ♍', end: [9, 22] },
-    { name: 'Libra ♎', end: [10, 22] },
-    { name: 'Scorpio ♏', end: [11, 21] },
-    { name: 'Sagittarius ♐', end: [12, 21] },
-    { name: 'Capricorn ♑', end: [12, 31] }
+    { name: 'Capricorn', end: [1, 19] },
+    { name: 'Aquarius', end: [2, 18] },
+    { name: 'Pisces', end: [3, 20] },
+    { name: 'Aries', end: [4, 19] },
+    { name: 'Taurus', end: [5, 20] },
+    { name: 'Gemini', end: [6, 20] },
+    { name: 'Cancer', end: [7, 22] },
+    { name: 'Leo', end: [8, 22] },
+    { name: 'Virgo', end: [9, 22] },
+    { name: 'Libra', end: [10, 22] },
+    { name: 'Scorpio', end: [11, 21] },
+    { name: 'Sagittarius', end: [12, 21] },
+    { name: 'Capricorn', end: [12, 31] }
   ];
 
   for (const sign of signs) {
@@ -22,7 +22,7 @@ export function getZodiacSign(month: number, day: number): string {
       return sign.name;
     }
   }
-  return 'Capricorn ♑';
+  return 'Capricorn';
 }
 
 /**
@@ -50,10 +50,11 @@ export function calculateBirthdayDetails(birthday: Birthday, referenceDate: Date
   const isThisWeek = daysUntil > 0 && daysUntil <= 7;
 
   // Age calculations
-  const nextAge = nextBirthday.getFullYear() - birthYear;
-  let currentAge = currentYear - birthYear;
+  const hasValidYear = birthYear >= 1900 && birthYear <= currentYear;
+  const nextAge = hasValidYear ? Math.max(0, nextBirthday.getFullYear() - birthYear) : 0;
+  let currentAge = hasValidYear ? currentYear - birthYear : 0;
   const hasHadBirthdayThisYear = today.getTime() >= new Date(currentYear, birthMonth - 1, birthDay).getTime();
-  if (!hasHadBirthdayThisYear) {
+  if (hasValidYear && !hasHadBirthdayThisYear) {
     currentAge -= 1;
   }
 
@@ -65,8 +66,8 @@ export function calculateBirthdayDetails(birthday: Birthday, referenceDate: Date
     isToday,
     isTomorrow,
     isThisWeek,
-    nextAge: Math.max(0, nextAge),
-    currentAge: Math.max(0, currentAge),
+    nextAge: hasValidYear ? Math.max(0, nextAge) : 0,
+    currentAge: hasValidYear ? Math.max(0, currentAge) : 0,
     nextBirthdayDate: nextBirthday,
     zodiacSign: zodiac,
   };
@@ -81,86 +82,8 @@ export function sortBirthdaysUpcoming(birthdays: Birthday[]): CalculatedBirthday
 }
 
 /**
- * Seed sample birthdays matching user specifications
+ * Seed sample birthdays - clean initial state with no hardcoded demo contacts
  */
 export function getInitialSeedBirthdays(): Birthday[] {
-  const now = new Date();
-  const currentYear = now.getFullYear();
-
-  // Aarav: Today
-  const todayMonth = String(now.getMonth() + 1).padStart(2, '0');
-  const todayDay = String(now.getDate()).padStart(2, '0');
-
-  // Priya: In 3 days
-  const in3Days = new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000);
-  const priyaMonth = String(in3Days.getMonth() + 1).padStart(2, '0');
-  const priyaDay = String(in3Days.getDate()).padStart(2, '0');
-
-  // Rahul: In 8 days
-  const in8Days = new Date(now.getTime() + 8 * 24 * 60 * 60 * 1000);
-  const rahulMonth = String(in8Days.getMonth() + 1).padStart(2, '0');
-  const rahulDay = String(in8Days.getDate()).padStart(2, '0');
-
-  // Ananya: Next month
-  const in30Days = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
-  const ananyaMonth = String(in30Days.getMonth() + 1).padStart(2, '0');
-  const ananyaDay = String(in30Days.getDate()).padStart(2, '0');
-
-  return [
-    {
-      id: 'seed-1',
-      name: 'Aarav Mehta',
-      birthDate: `${currentYear - 25}-${todayMonth}-${todayDay}`,
-      relationship: 'family',
-      notes: 'Loves coffee and tech gadgets. Call in the morning!',
-      avatarColor: '#4F46E5',
-      reminders: [
-        { id: 'r1', timing: 'on_day', time: '09:00', enabled: true },
-        { id: 'r2', timing: 'day_before', time: '18:00', enabled: true },
-      ],
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    },
-    {
-      id: 'seed-2',
-      name: 'Priya Sharma',
-      birthDate: `${currentYear - 24}-${priyaMonth}-${priyaDay}`,
-      relationship: 'friend',
-      notes: 'Gift idea: Art sketchbook or fiction books',
-      avatarColor: '#DB2777',
-      reminders: [
-        { id: 'r3', timing: 'on_day', time: '09:00', enabled: true },
-        { id: 'r4', timing: 'day_before', time: '20:00', enabled: true },
-      ],
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    },
-    {
-      id: 'seed-3',
-      name: 'Rahul Verma',
-      birthDate: `${currentYear - 23}-${rahulMonth}-${rahulDay}`,
-      relationship: 'love',
-      notes: 'Dinner reservation at rooftop bistro',
-      avatarColor: '#EA580C',
-      reminders: [
-        { id: 'r5', timing: 'on_day', time: '08:00', enabled: true },
-        { id: 'r6', timing: 'week_before', time: '10:00', enabled: true },
-      ],
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    },
-    {
-      id: 'seed-4',
-      name: 'Ananya Gupta',
-      birthDate: `${currentYear - 28}-${ananyaMonth}-${ananyaDay}`,
-      relationship: 'work',
-      notes: 'Colleague on frontend team',
-      avatarColor: '#059669',
-      reminders: [
-        { id: 'r7', timing: 'on_day', time: '09:30', enabled: true },
-      ],
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    }
-  ];
+  return [];
 }

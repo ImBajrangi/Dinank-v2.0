@@ -54,11 +54,35 @@ export const PALETTES = {
 };
 
 export const RELATIONSHIP_COLORS: Record<string, { bg: string; text: string; label: string; tint: string }> = {
+  student: { bg: 'rgba(88, 86, 214, 0.15)', text: '#5856D6', label: 'Student', tint: '#5856D6' },
   family: { bg: 'rgba(255, 149, 0, 0.15)', text: '#FF9500', label: 'Family', tint: '#FF9500' },
   friend: { bg: 'rgba(0, 122, 255, 0.15)', text: '#007AFF', label: 'Friend', tint: '#007AFF' },
-  love: { bg: 'rgba(255, 45, 85, 0.15)', text: '#FF2D55', label: 'Love', tint: '#FF2D55' },
   work: { bg: 'rgba(175, 82, 222, 0.15)', text: '#AF52DE', label: 'Work', tint: '#AF52DE' },
   other: { bg: 'rgba(142, 142, 147, 0.15)', text: '#8E8E93', label: 'Other', tint: '#8E8E93' },
+};
+
+export const getCategoryStyle = (category: string = 'other'): { bg: string; text: string; label: string; tint: string } => {
+  const normalized = (category || 'other').toLowerCase().trim();
+  if (RELATIONSHIP_COLORS[normalized]) {
+    return RELATIONSHIP_COLORS[normalized];
+  }
+  const customPalette = [
+    { bg: 'rgba(50, 173, 230, 0.15)', text: '#32ADE6', tint: '#32ADE6' },
+    { bg: 'rgba(255, 45, 85, 0.15)', text: '#FF2D55', tint: '#FF2D55' },
+    { bg: 'rgba(48, 209, 88, 0.15)', text: '#30D158', tint: '#30D158' },
+    { bg: 'rgba(162, 132, 94, 0.15)', text: '#A2845E', tint: '#A2845E' },
+    { bg: 'rgba(94, 92, 230, 0.15)', text: '#5E5CE6', tint: '#5E5CE6' },
+    { bg: 'rgba(255, 159, 10, 0.15)', text: '#FF9F0A', tint: '#FF9F0A' },
+  ];
+  let hash = 0;
+  for (let i = 0; i < category.length; i++) {
+    hash = category.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  const chosen = customPalette[Math.abs(hash) % customPalette.length];
+  return {
+    ...chosen,
+    label: category.charAt(0).toUpperCase() + category.slice(1),
+  };
 };
 
 export const AVATAR_COLORS = [

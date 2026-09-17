@@ -28,6 +28,24 @@ export class NotificationService {
         // Ignored if handler is unavailable
       }
 
+      if (Platform.OS === 'android') {
+        try {
+          await Notifications.setNotificationChannelAsync('birthday-reminders', {
+            name: 'Birthday Reminders',
+            importance: Notifications.AndroidImportance.MAX,
+            sound: 'default',
+            enableVibrate: true,
+            vibrationPattern: [0, 250, 250, 250],
+            showBadge: true,
+            lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
+            bypassDnd: false,
+            lightColor: '#007AFF',
+          });
+        } catch (chanErr) {
+          // Channel setup fallback
+        }
+      }
+
       const hasPermission = await this.requestPermissions();
       this.initialized = true;
       return hasPermission;
@@ -118,15 +136,15 @@ export class NotificationService {
         let body = '';
 
         if (reminder.timing === 'on_day') {
-          title = `🎂 Today is ${birthday.name}'s Birthday!`;
+          title = `Today is ${birthday.name}'s Birthday!`;
           body = turningAge > 0 
-            ? `${birthday.name} is turning ${turningAge} today! Send a warm wish.`
-            : `Wish ${birthday.name} a fantastic birthday today!`;
+            ? `${birthday.name} is turning ${turningAge} today. Send a warm wish.`
+            : `Wish ${birthday.name} a fantastic birthday today.`;
         } else if (reminder.timing === 'day_before') {
-          title = `🎁 Tomorrow is ${birthday.name}'s Birthday!`;
-          body = `Get ready! ${birthday.name}'s birthday is coming up tomorrow.`;
+          title = `Tomorrow is ${birthday.name}'s Birthday!`;
+          body = `Get ready. ${birthday.name}'s birthday is coming up tomorrow.`;
         } else if (reminder.timing === 'week_before') {
-          title = `🗓️ ${birthday.name}'s Birthday in 7 Days`;
+          title = `${birthday.name}'s Birthday in 7 Days`;
           body = `Remember to plan ahead for ${birthday.name}'s birthday next week.`;
         }
 
@@ -138,6 +156,7 @@ export class NotificationService {
               data: { birthdayId: birthday.id },
               sound: 'default',
               priority: Notifications.AndroidNotificationPriority.MAX,
+              ...(Platform.OS === 'android' ? { channelId: 'birthday-reminders' } : {}),
             },
             trigger: {
               type: Notifications.SchedulableTriggerInputTypes.DATE,
@@ -210,6 +229,7 @@ export class NotificationService {
           body,
           sound: 'default',
           priority: Notifications.AndroidNotificationPriority.MAX,
+          ...(Platform.OS === 'android' ? { channelId: 'birthday-reminders' } : {}),
         },
         trigger: null, // null trigger forces immediate post to OS notification shade
       });

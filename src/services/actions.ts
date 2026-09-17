@@ -4,24 +4,44 @@ import { CalculatedBirthday } from '../types/birthday';
 
 export class ActionService {
   /**
-   * Format personalized birthday greeting message using template and tokens
+   * Format personalized birthday greeting message using template and tokens based on category
    */
-  static formatStudentGreeting(
-    template: string | undefined,
+  static formatCategoryGreeting(
     birthday: CalculatedBirthday,
-    senderName?: string
+    senderName?: string,
+    customTemplate?: string
   ): string {
-    const defaultTpl =
-      "Dear *{name}*, wishing you a very *Happy Birthday!* 🎂 May this year bring you wisdom, great success, and joy. Keep shining in *{class}*! 🎉\n\nBest regards,\n*{sender_name}*";
+    if (customTemplate && customTemplate.trim().length > 0) {
+      return customTemplate
+        .replace(/{name}/g, birthday.name || '')
+        .replace(/{class}/g, birthday.groupClass || (birthday.section ? `Section ${birthday.section}` : 'Class'))
+        .replace(/{section}/g, birthday.section || '')
+        .replace(/{session}/g, birthday.session || '')
+        .replace(/{age}/g, String(birthday.nextAge || ''))
+        .replace(/{sender_name}/g, senderName || 'Your Well-Wisher')
+        .replace(/{notes}/g, birthday.notes || '');
+    }
 
-    const tpl = template && template.trim().length > 0 ? template : defaultTpl;
+    const sender = senderName || 'Your Well-Wisher';
+    const classInfo = [birthday.groupClass, birthday.section ? `Sec ${birthday.section}` : null].filter(Boolean).join(' - ');
 
-    return tpl
-      .replace(/{name}/g, birthday.name || 'Friend')
-      .replace(/{class}/g, birthday.groupClass || 'Class')
-      .replace(/{age}/g, String(birthday.nextAge || ''))
-      .replace(/{sender_name}/g, senderName || 'Your Well-Wisher')
-      .replace(/{notes}/g, birthday.notes || '');
+    switch (birthday.relationship) {
+      case 'student':
+        return `Dear *${birthday.name}*, wishing you a very *Happy Birthday!* 🎂🎓\n\nMay this year bring you wisdom, excellent academic success, and immense joy. Keep shining${classInfo ? ` in *${classInfo}*` : ''}! ✨🎉\n\nBest regards,\n*${sender}*`;
+
+      case 'family':
+        return `Happy Birthday, *${birthday.name}*! 🎂❤️\n\nHaving you in my life is a true blessing. Wishing you good health, endless smiles, and abundant happiness this year and always! 💐\n\nWith love,\n*${sender}*`;
+
+      case 'friend':
+        return `Happy Birthday to my great friend *${birthday.name}*! 🎉🥳\n\nWishing you an epic day packed with laughter, fun, and memorable moments! Cheers to another awesome year! 🍰✨\n\n- *${sender}*`;
+
+      case 'work':
+        return `Dear *${birthday.name}*, wishing you a very *Happy Birthday!* 🎂🌟\n\nIt is a pleasure working with you. May this upcoming year bring you continued professional success and happiness.\n\nWarm regards,\n*${sender}*`;
+
+      case 'other':
+      default:
+        return `Wishing you a very Happy Birthday, *${birthday.name}*! 🎂🎉\n\nMay your day be filled with celebration, peace, and great achievements in the year ahead!\n\nBest regards,\n*${sender}*`;
+    }
   }
 
   /**
@@ -32,14 +52,17 @@ export class ActionService {
     birthday: CalculatedBirthday,
     senderName?: string
   ): string {
+    const classInfo = [birthday.groupClass, birthday.section ? `Sec ${birthday.section}` : null].filter(Boolean).join(' - ');
     const defaultTpl =
-      "Dear Parent, heartfelt congratulations on *{name}*'s birthday today! 💐 Wishing your child a glorious year ahead filled with good health and academic excellence.\n\nWarm regards,\n*{sender_name}* (*{class}*)";
+      `Dear Parent, heartfelt congratulations on *{name}*'s birthday today! 💐 Wishing your child a glorious year ahead filled with good health and academic excellence. 🎓\n\nWarm regards,\n*{sender_name}*${classInfo ? ` (*${classInfo}*)` : ''}`;
 
     const tpl = template && template.trim().length > 0 ? template : defaultTpl;
 
     return tpl
       .replace(/{name}/g, birthday.name || 'your child')
-      .replace(/{class}/g, birthday.groupClass || 'Class')
+      .replace(/{class}/g, classInfo || 'Class')
+      .replace(/{section}/g, birthday.section || '')
+      .replace(/{session}/g, birthday.session || '')
       .replace(/{age}/g, String(birthday.nextAge || ''))
       .replace(/{sender_name}/g, senderName || 'Teacher')
       .replace(/{notes}/g, birthday.notes || '');
@@ -55,7 +78,7 @@ export class ActionService {
     }
     try {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    } catch (e) {}
+    } catch (e) { }
 
     const clean = phoneNumber.replace(/[^0-9+]/g, '');
     const url = `tel:${clean}`;
@@ -83,9 +106,9 @@ export class ActionService {
   ): Promise<boolean> {
     try {
       Haptics.selectionAsync();
-    } catch (e) {}
+    } catch (e) { }
 
-    const msg = message || `Happy Birthday ${name || ''}! 🎂 Wishing you a wonderful celebration today! 🎉`;
+    const msg = message || `Happy Birthday ${name || ''}! Wishing you a wonderful celebration today!`;
     const cleanPhone = phoneNumber ? phoneNumber.replace(/[^0-9]/g, '') : '';
     const encoded = encodeURIComponent(msg);
 
@@ -130,9 +153,9 @@ export class ActionService {
   ): Promise<boolean> {
     try {
       Haptics.selectionAsync();
-    } catch (e) {}
+    } catch (e) { }
 
-    const msg = message || `Happy Birthday ${name || ''}! 🎂 Wishing you a wonderful year ahead! 🎉`;
+    const msg = message || `Happy Birthday ${name || ''}! Wishing you a wonderful year ahead!`;
     const cleanPhone = phoneNumber ? phoneNumber.replace(/[^0-9+]/g, '') : '';
     const encoded = encodeURIComponent(msg);
     const separator = Platform.OS === 'ios' ? '&' : '?';
@@ -168,9 +191,9 @@ export class ActionService {
     }
     try {
       Haptics.selectionAsync();
-    } catch (e) {}
+    } catch (e) { }
 
-    const sub = subject || `Happy Birthday ${name || ''}! 🎂`;
+    const sub = subject || `Happy Birthday ${name || ''}!`;
     const bod = body || `Wishing you the happiest of birthdays, ${name || ''}! May this year bring you great joy, health, and success!`;
     const url = `mailto:${email.trim()}?subject=${encodeURIComponent(sub)}&body=${encodeURIComponent(bod)}`;
 
@@ -194,16 +217,16 @@ export class ActionService {
   static async shareContact(birthday: CalculatedBirthday): Promise<void> {
     try {
       Haptics.selectionAsync();
-    } catch (e) {}
+    } catch (e) { }
 
     const [, m, d] = birthday.birthDate.split('-');
     const formatted = `${d}/${m}`;
     const info = [
-      `🎂 ${birthday.name}'s Birthday Reminder`,
-      `📅 Date: ${formatted} (Turning ${birthday.nextAge})`,
-      birthday.groupClass ? `🏷️ Group/Class: ${birthday.groupClass}` : null,
-      birthday.phone ? `📱 Phone: ${birthday.phone}` : null,
-      birthday.notes ? `📝 Note: ${birthday.notes}` : null,
+      `${birthday.name}'s Birthday Reminder`,
+      `Date: ${formatted} (Turning ${birthday.nextAge})`,
+      birthday.groupClass ? `Group/Class: ${birthday.groupClass}` : null,
+      birthday.phone ? `Phone: ${birthday.phone}` : null,
+      birthday.notes ? `Note: ${birthday.notes}` : null,
     ]
       .filter(Boolean)
       .join('\n');
@@ -213,6 +236,6 @@ export class ActionService {
         title: `${birthday.name}'s Birthday`,
         message: info,
       });
-    } catch (e) {}
+    } catch (e) { }
   }
 }

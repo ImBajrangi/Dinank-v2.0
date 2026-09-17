@@ -1,7 +1,8 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
-import { Gift, Plus } from 'lucide-react-native';
+import { Plus } from 'lucide-react-native';
 import { useBirthdays } from '../context/BirthdayContext';
+import { AppLogo } from './AppLogo';
 
 interface EmptyStateProps {
   title?: string;
@@ -12,7 +13,7 @@ interface EmptyStateProps {
 
 export const EmptyState: React.FC<EmptyStateProps> = React.memo(({
   title = 'No Birthdays Found',
-  subtitle = 'Add your friends, family, and loved ones so you never miss their special day.',
+  subtitle = 'Add your students, friends, and family so you never miss their special day.',
   actionLabel = 'Add Birthday',
   onAction,
 }) => {
@@ -23,10 +24,23 @@ export const EmptyState: React.FC<EmptyStateProps> = React.memo(({
       <View
         style={[
           styles.iconCircle,
-          { backgroundColor: isDark ? colors.surfaceSubtle : colors.accentLight },
+          {
+            backgroundColor: isDark ? colors.surface : colors.surfaceSubtle,
+            borderWidth: 1,
+            borderColor: isDark ? colors.surfaceBorder : colors.cardBorder,
+            shadowColor: colors.accent,
+            shadowOffset: { width: 0, height: 4 },
+            shadowOpacity: isDark ? 0.25 : 0.1,
+            shadowRadius: 12,
+            elevation: 4,
+          },
         ]}
       >
-        <Gift size={36} color={colors.accent} />
+        <AppLogo
+          size={42}
+          color={colors.accent}
+          eyeColor={isDark ? colors.surface : '#FFFFFF'}
+        />
       </View>
       <Text style={[styles.title, { color: colors.textPrimary }]}>{title}</Text>
       <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
@@ -86,5 +100,10 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontWeight: '600',
     fontSize: 15,
+  },
+  logoImg: {
+    width: 50,
+    height: 50,
+    borderRadius: 12,
   },
 });

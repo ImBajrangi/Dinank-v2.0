@@ -10,6 +10,7 @@ import {
   Share,
   Platform,
   StatusBar,
+  Image,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
@@ -32,14 +33,25 @@ import {
   Sliders,
   Volume2,
   UserCheck,
+  Globe,
+  ArrowUpCircle,
 } from 'lucide-react-native';
 import { useBirthdays } from '../context/BirthdayContext';
 import { NotificationService } from '../services/notifications';
+import { AppleSwitch } from '../components/AppleSwitch';
 import { ImporterService } from '../services/importer';
 import { ImportModal } from '../components/ImportModal';
 import { PersonalizationModal } from '../components/PersonalizationModal';
+import { ClockTimePickerModal } from '../components/ClockTimePickerModal';
+import { AboutModal } from '../components/AboutModal';
+import { SoundPickerModal } from '../components/SoundPickerModal';
+import { UpdateModal } from '../components/UpdateModal';
+import { SavedSourcesModal } from '../components/SavedSourcesModal';
+import { ExportModal } from '../components/ExportModal';
 import { Avatar } from '../components/Avatar';
+import { AppLogo } from '../components/AppLogo';
 import { ThemePreference } from '../types/birthday';
+import { AutoUpdateService, AppUpdateInfo, CURRENT_APP_VERSION } from '../services/updater';
 
 export const SettingsScreen: React.FC = () => {
   const {
@@ -52,19 +64,72 @@ export const SettingsScreen: React.FC = () => {
     triggerSystemNotificationTest,
     refreshNotifications,
     birthdays,
+    savedSources,
+    cleanDuplicateBirthdays,
     todayBirthdays,
     upcomingBirthdays,
   } = useBirthdays();
 
   const insets = useSafeAreaInsets();
-  const topInset = Math.max(
-    insets.top,
-    Platform.OS === 'android' ? (StatusBar.currentHeight || 28) : 20
-  );
+  const topInset = Platform.OS === 'android' ? (StatusBar.currentHeight || 24) : insets.top;
 
   const [testingNotif, setTestingNotif] = useState(false);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+  const [isSavedSourcesOpen, setIsSavedSourcesOpen] = useState(false);
+  const [isExportModalOpen, setIsExportModalOpen] = useState(false);
   const [isPersonalizationOpen, setIsPersonalizationOpen] = useState(false);
+  const [isClockPickerOpen, setIsClockPickerOpen] = useState(false);
+  const [isAboutModalOpen, setIsAboutModalOpen] = useState(false);
+  const [isSoundPickerOpen, setIsSoundPickerOpen] = useState(false);
+
+  // Auto-Update state
+  const [checkingUpdate, setCheckingUpdate] = useState(false);
+  const [updateInfo, setUpdateInfo] = useState<AppUpdateInfo | null>(null);
+  const [isUpdateModalOpen, setIsUpdateModalOpen] = useState(false);
+
+  const handleCleanDuplicatesFromSettings = async () => {
+    try {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    } catch (e) {}
+
+    const removed = await cleanDuplicateBirthdays();
+    if (removed > 0) {
+      try {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      } catch (e) {}
+      Alert.alert('Cleanup Complete', `Successfully merged and removed ${removed} duplicate contacts.`);
+    } else {
+      Alert.alert('Clean List', 'No duplicate contacts found! Your database is completely clean.');
+    }
+  };
+
+  const handleManualCheckUpdate = async () => {
+    try {
+      Haptics.selectionAsync();
+    } catch (e) {}
+    setCheckingUpdate(true);
+    try {
+      const info = await AutoUpdateService.checkForUpdates(true);
+      setCheckingUpdate(false);
+      if (info.hasUpdate) {
+        setUpdateInfo(info);
+        setIsUpdateModalOpen(true);
+      } else {
+        Alert.alert(
+          'You’re Up to Date',
+          `Dinank v${CURRENT_APP_VERSION} is currently the latest version.`,
+          [{ text: 'OK' }]
+        );
+      }
+    } catch (err) {
+      setCheckingUpdate(false);
+      Alert.alert(
+        'Check Failed',
+        'Could not verify updates at this time. Please check your internet connection.',
+        [{ text: 'OK' }]
+      );
+    }
+  };
 
   // Group statistics
   const distinctGroups = React.useMemo(() => {
@@ -81,7 +146,7 @@ export const SettingsScreen: React.FC = () => {
 
     if (sent) {
       Alert.alert(
-        'System Notification Dispatched 🔔',
+        'System Notification Dispatched',
         'Direct local device reminder is operational.'
       );
     }
@@ -142,9 +207,9 @@ export const SettingsScreen: React.FC = () => {
       case 'aurora':
         return 'Apple Aurora';
       case 'harp':
-        return 'Gentle Harp';
+        return 'Melodic Harp';
       case 'pop':
-        return 'Pop Chord';
+        return 'Pop Accent';
       case 'silent':
         return 'Vibrate Only';
       default:
@@ -174,12 +239,23 @@ export const SettingsScreen: React.FC = () => {
           }}
           style={[styles.profileCard, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}
         >
-          <Avatar
-            name={settings.senderName || 'Dinank'}
-            size={50}
-            backgroundColor={colors.accent}
-            fontSize={19}
-          />
+          <View
+            style={{
+              width: 50,
+              height: 50,
+              borderRadius: 25,
+              backgroundColor: colors.accent,
+              alignItems: 'center',
+              justifyContent: 'center',
+              shadowColor: colors.accent,
+              shadowOffset: { width: 0, height: 2 },
+              shadowOpacity: isDark ? 0.35 : 0.15,
+              shadowRadius: 6,
+              elevation: 3,
+            }}
+          >
+            <AppLogo size={30} color="#FFFFFF" eyeColor={colors.accent} />
+          </View>
           <View style={styles.profileInfo}>
             <Text style={[styles.profileName, { color: colors.textPrimary }]}>
               {settings.senderName || 'Set Your Name'}
@@ -274,7 +350,7 @@ export const SettingsScreen: React.FC = () => {
               try {
                 Haptics.selectionAsync();
               } catch (e) {}
-              setIsPersonalizationOpen(true);
+              setIsSoundPickerOpen(true);
             }}
             style={styles.cellRow}
           >
@@ -337,47 +413,63 @@ export const SettingsScreen: React.FC = () => {
 
           <View style={[styles.separator, { backgroundColor: colors.surfaceBorder }]} />
 
-          {/* On Birthday Switch */}
-          <View style={styles.cellRow}>
-            <View style={[styles.iconBox, { backgroundColor: '#FF9500' }]}>
-              <Sparkles size={16} color="#FFFFFF" />
+            {/* On Birthday Switch */}
+            <View style={styles.cellRow}>
+              <View style={[styles.iconBox, { backgroundColor: '#FF9500' }]}>
+                <Sparkles size={16} color="#FFFFFF" />
+              </View>
+              <View style={styles.cellContent}>
+                <Text style={[styles.cellLabel, { color: colors.textPrimary }]}>
+                  Remind On Birthday
+                </Text>
+              </View>
+              <AppleSwitch
+                value={settings.notifyOnDay}
+                onValueChange={(val) => handleToggle('notifyOnDay', val)}
+              />
             </View>
-            <View style={styles.cellContent}>
-              <Text style={[styles.cellLabel, { color: colors.textPrimary }]}>
-                Remind On Birthday
-              </Text>
-            </View>
-            <Switch
-              value={settings.notifyOnDay}
-              onValueChange={(val) => handleToggle('notifyOnDay', val)}
-              trackColor={{ false: isDark ? '#39393D' : '#E9E9EB', true: '#34C759' }}
-            />
-          </View>
 
-          <View style={[styles.separator, { backgroundColor: colors.surfaceBorder }]} />
+            <View style={[styles.separator, { backgroundColor: colors.surfaceBorder }]} />
 
-          {/* 1 Day Before Switch */}
-          <View style={styles.cellRow}>
-            <View style={[styles.iconBox, { backgroundColor: '#007AFF' }]}>
-              <Clock size={16} color="#FFFFFF" />
+            {/* 1 Day Before Switch */}
+            <View style={styles.cellRow}>
+              <View style={[styles.iconBox, { backgroundColor: '#007AFF' }]}>
+                <Clock size={16} color="#FFFFFF" />
+              </View>
+              <View style={styles.cellContent}>
+                <Text style={[styles.cellLabel, { color: colors.textPrimary }]}>
+                  Remind 1 Day Before
+                </Text>
+              </View>
+              <AppleSwitch
+                value={settings.notifyDayBefore}
+                onValueChange={(val) => handleToggle('notifyDayBefore', val)}
+              />
             </View>
-            <View style={styles.cellContent}>
-              <Text style={[styles.cellLabel, { color: colors.textPrimary }]}>
-                Remind 1 Day Before
-              </Text>
-            </View>
-            <Switch
-              value={settings.notifyDayBefore}
-              onValueChange={(val) => handleToggle('notifyDayBefore', val)}
-              trackColor={{ false: isDark ? '#39393D' : '#E9E9EB', true: '#34C759' }}
-            />
-          </View>
         </View>
 
         {/* Section 3: Default Alert Time */}
-        <Text style={[styles.sectionHeader, { color: colors.textSecondary }]}>
-          DEFAULT ALERT TIME
-        </Text>
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 14, marginBottom: 6, paddingHorizontal: 4 }}>
+          <Text style={[styles.sectionHeader, { marginTop: 0, marginBottom: 0, paddingHorizontal: 0, color: colors.textSecondary }]}>
+            DEFAULT ALERT TIME
+          </Text>
+          <TouchableOpacity
+            activeOpacity={0.7}
+            onPress={() => {
+              try {
+                Haptics.selectionAsync();
+              } catch (e) {}
+              setIsClockPickerOpen(true);
+            }}
+            style={{ flexDirection: 'row', alignItems: 'center' }}
+          >
+            <Clock size={13} color={colors.accent} style={{ marginRight: 4 }} />
+            <Text style={{ fontSize: 13, fontWeight: '600', color: colors.accent }}>
+              Custom Clock
+            </Text>
+          </TouchableOpacity>
+        </View>
+
         <View style={[styles.groupedCard, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}>
           <View style={styles.timePillGrid}>
             {TIMES.map((t) => {
@@ -410,6 +502,46 @@ export const SettingsScreen: React.FC = () => {
                 </TouchableOpacity>
               );
             })}
+
+            {/* If current time is not in presets, show active custom pill */}
+            {!TIMES.includes(settings.defaultReminderTime) && (
+              <TouchableOpacity
+                activeOpacity={0.7}
+                onPress={() => setIsClockPickerOpen(true)}
+                style={[
+                  styles.timePill,
+                  {
+                    backgroundColor: colors.accent,
+                  },
+                ]}
+              >
+                <Text style={[styles.timePillText, { color: '#FFFFFF', fontWeight: '700' }]}>
+                  {settings.defaultReminderTime}
+                </Text>
+              </TouchableOpacity>
+            )}
+
+            <TouchableOpacity
+              activeOpacity={0.7}
+              onPress={() => {
+                try {
+                  Haptics.selectionAsync();
+                } catch (e) {}
+                setIsClockPickerOpen(true);
+              }}
+              style={[
+                styles.timePill,
+                {
+                  backgroundColor: isDark ? '#2C2C2E' : '#E5E5EA',
+                  borderColor: colors.accent,
+                  borderWidth: 0.5,
+                },
+              ]}
+            >
+              <Text style={[styles.timePillText, { color: colors.accent, fontWeight: '600' }]}>
+                + Set Clock
+              </Text>
+            </TouchableOpacity>
           </View>
         </View>
 
@@ -482,6 +614,33 @@ export const SettingsScreen: React.FC = () => {
 
           <View style={[styles.separator, { backgroundColor: colors.surfaceBorder }]} />
 
+          {/* Saved Data Sources & Synced Links */}
+          <TouchableOpacity
+            activeOpacity={0.65}
+            onPress={() => {
+              try {
+                Haptics.selectionAsync();
+              } catch (e) {}
+              setIsSavedSourcesOpen(true);
+            }}
+            style={styles.cellRow}
+          >
+            <View style={[styles.iconBox, { backgroundColor: '#007AFF' }]}>
+              <Globe size={16} color="#FFFFFF" />
+            </View>
+            <View style={styles.cellContent}>
+              <Text style={[styles.cellLabel, { color: colors.textPrimary }]}>
+                Saved Sources & Links
+              </Text>
+              <Text style={[styles.cellSubLabel, { color: colors.textSecondary }]}>
+                {savedSources.length} saved sheets/files • Edit, re-sync or delete
+              </Text>
+            </View>
+            <ChevronRight size={16} color={colors.textMuted} />
+          </TouchableOpacity>
+
+          <View style={[styles.separator, { backgroundColor: colors.surfaceBorder }]} />
+
           {/* Import Excel / CSV / Google Sheets */}
           <TouchableOpacity
             activeOpacity={0.65}
@@ -512,34 +671,92 @@ export const SettingsScreen: React.FC = () => {
           {/* Export CSV Spreadsheet */}
           <TouchableOpacity
             activeOpacity={0.65}
-            onPress={handleExportCSV}
+            onPress={() => {
+              try {
+                Haptics.selectionAsync();
+              } catch (e) {}
+              setIsExportModalOpen(true);
+            }}
             style={styles.cellRow}
           >
-            <View style={[styles.iconBox, { backgroundColor: '#007AFF' }]}>
+            <View style={[styles.iconBox, { backgroundColor: '#5AC8FA' }]}>
               <Share2 size={16} color="#FFFFFF" />
             </View>
             <View style={styles.cellContent}>
               <Text style={[styles.cellLabel, { color: colors.textPrimary }]}>
                 Export CSV
               </Text>
+              <Text style={[styles.cellSubLabel, { color: colors.textSecondary }]}>
+                Select custom contacts & columns
+              </Text>
             </View>
             <ChevronRight size={16} color={colors.textMuted} />
+          </TouchableOpacity>
+        </View>
+
+        {/* Section 4: About & Brand Identity */}
+        <Text style={[styles.sectionHeader, { color: colors.textSecondary }]}>
+          ABOUT
+        </Text>
+        <View style={[styles.groupedCard, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}>
+          <TouchableOpacity
+            activeOpacity={0.7}
+            onPress={() => {
+              try {
+                Haptics.selectionAsync();
+              } catch (e) {}
+              setIsAboutModalOpen(true);
+            }}
+            style={[styles.cellRow, { paddingVertical: 14 }]}
+          >
+            <View
+              style={{
+                width: 44,
+                height: 44,
+                borderRadius: 12,
+                backgroundColor: isDark ? colors.surface : colors.surfaceSubtle,
+                alignItems: 'center',
+                justifyContent: 'center',
+                marginRight: 14,
+                borderWidth: 1,
+                borderColor: isDark ? colors.surfaceBorder : colors.cardBorder,
+              }}
+            >
+              <AppLogo
+                size={30}
+                color={colors.accent}
+                eyeColor={isDark ? colors.surface : '#FFFFFF'}
+              />
+            </View>
+            <View style={styles.cellContent}>
+              <Text style={[styles.cellLabel, { fontWeight: '700', color: colors.textPrimary }]}>
+                Dinank
+              </Text>
+              <Text style={[styles.cellSubLabel, { color: colors.textSecondary }]}>
+                Developed by Vrindopnishad • v{CURRENT_APP_VERSION}
+              </Text>
+            </View>
+            <ChevronRight size={18} color={colors.textMuted} />
           </TouchableOpacity>
 
           <View style={[styles.separator, { backgroundColor: colors.surfaceBorder }]} />
 
-          {/* Export JSON Backup */}
+          {/* Check for Updates row */}
           <TouchableOpacity
             activeOpacity={0.65}
-            onPress={handleExportJSON}
+            onPress={handleManualCheckUpdate}
             style={styles.cellRow}
+            disabled={checkingUpdate}
           >
-            <View style={[styles.iconBox, { backgroundColor: '#AF52DE' }]}>
-              <Download size={16} color="#FFFFFF" />
+            <View style={[styles.iconBox, { backgroundColor: '#007AFF' }]}>
+              <ArrowUpCircle size={16} color="#FFFFFF" />
             </View>
             <View style={styles.cellContent}>
               <Text style={[styles.cellLabel, { color: colors.textPrimary }]}>
-                Backup JSON
+                {checkingUpdate ? 'Checking GitHub Releases...' : 'Check for Updates'}
+              </Text>
+              <Text style={[styles.cellSubLabel, { color: colors.textSecondary }]}>
+                Current: v{CURRENT_APP_VERSION} (Direct In-App Updater)
               </Text>
             </View>
             <ChevronRight size={16} color={colors.textMuted} />
@@ -553,10 +770,52 @@ export const SettingsScreen: React.FC = () => {
         onClose={() => setIsImportModalOpen(false)}
       />
 
+      {/* Saved Data Sources & Links Sheet */}
+      <SavedSourcesModal
+        visible={isSavedSourcesOpen}
+        onClose={() => setIsSavedSourcesOpen(false)}
+        onOpenImport={() => setIsImportModalOpen(true)}
+      />
+
+      {/* Selective Data Export Modal */}
+      <ExportModal
+        visible={isExportModalOpen}
+        onClose={() => setIsExportModalOpen(false)}
+      />
+
       {/* Personalization Modal */}
       <PersonalizationModal
         visible={isPersonalizationOpen}
         onClose={() => setIsPersonalizationOpen(false)}
+      />
+
+      {/* Clock Time Picker Modal */}
+      <ClockTimePickerModal
+        visible={isClockPickerOpen}
+        initialTime={settings.defaultReminderTime}
+        onClose={() => setIsClockPickerOpen(false)}
+        onSaveTime={(newTime) => updateSettings({ defaultReminderTime: newTime })}
+      />
+
+      {/* About & Developer Contact Modal */}
+      <AboutModal
+        visible={isAboutModalOpen}
+        onClose={() => setIsAboutModalOpen(false)}
+      />
+
+      {/* Dedicated Alert Sound Picker Modal */}
+      <SoundPickerModal
+        visible={isSoundPickerOpen}
+        selectedSound={settings.notificationSound || 'default'}
+        onSelectSound={(soundId) => updateSettings({ notificationSound: soundId })}
+        onClose={() => setIsSoundPickerOpen(false)}
+      />
+
+      {/* In-App Auto-Updater Modal */}
+      <UpdateModal
+        visible={isUpdateModalOpen}
+        updateInfo={updateInfo}
+        onClose={() => setIsUpdateModalOpen(false)}
       />
     </View>
   );
