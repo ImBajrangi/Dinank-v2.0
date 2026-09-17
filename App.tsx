@@ -199,6 +199,7 @@ import { CalendarScreen } from './src/screens/CalendarScreen';
 import { PeopleScreen } from './src/screens/PeopleScreen';
 import { SettingsScreen } from './src/screens/SettingsScreen';
 
+import * as Notifications from 'expo-notifications';
 import { AddBirthdayModal } from './src/components/AddBirthdayModal';
 import { BirthdayDetailModal } from './src/components/BirthdayDetailModal';
 import { AIWishModal } from './src/components/AIWishModal';
@@ -209,7 +210,7 @@ import { AutoUpdateService, AppUpdateInfo } from './src/services/updater';
 type Tab = 'home' | 'calendar' | 'people' | 'settings';
 
 const MainApp: React.FC = () => {
-  const { colors, isDark } = useBirthdays();
+  const { colors, isDark, calculatedBirthdays } = useBirthdays();
   const insets = useSafeAreaInsets();
   const [activeTab, setActiveTab] = useState<Tab>('home');
 
@@ -223,6 +224,25 @@ const MainApp: React.FC = () => {
   // Auto-Update states
   const [updateInfo, setUpdateInfo] = useState<AppUpdateInfo | null>(null);
   const [isUpdateModalOpen, setIsUpdateModalOpen] = useState(false);
+
+  // Deep-link when user taps a system notification from lockscreen or notification tray
+  React.useEffect(() => {
+    if (Platform.OS === 'web') return;
+
+    const subscription = Notifications.addNotificationResponseReceivedListener((response) => {
+      const bdayId = response.notification.request.content.data?.birthdayId;
+      if (bdayId) {
+        const found = calculatedBirthdays.find((b) => b.id === bdayId);
+        if (found) {
+          setSelectedBirthday(found);
+        }
+      }
+    });
+
+    return () => {
+      subscription.remove();
+    };
+  }, [calculatedBirthdays]);
 
   React.useEffect(() => {
     // Check for updates quietly after app loads

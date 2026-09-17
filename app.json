@@ -2,7 +2,7 @@
   "expo": {
     "name": "Dinank",
     "slug": "dinank",
-    "version": "2.0.0",
+    "version": "2.0.2",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
@@ -13,7 +13,7 @@
     },
     "android": {
       "package": "com.sakhi.birthdayreminder",
-      "versionCode": 2,
+      "versionCode": 4,
       "adaptiveIcon": {
         "backgroundColor": "#0F172A",
         "foregroundImage": "./assets/android-icon-foreground.png",
@@ -23,6 +23,7 @@
       "permissions": [
         "RECEIVE_BOOT_COMPLETED",
         "SCHEDULE_EXACT_ALARM",
+        "WAKE_LOCK",
         "POST_NOTIFICATIONS",
         "REQUEST_INSTALL_PACKAGES"
       ]
@@ -31,8 +32,8 @@
       [
         "expo-notifications",
         {
-          "icon": "./assets/icon.png",
-          "color": "#6366F1",
+          "icon": "./assets/notification-icon.png",
+          "color": "#007AFF",
           "defaultChannel": "birthday-reminders"
         }
       ]

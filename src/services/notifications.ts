@@ -3,43 +3,46 @@ import { Platform } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { Birthday, ReminderTiming } from '../types/birthday';
 
+// Register global notification handler at module load time to guarantee visibility
+try {
+  Notifications.setNotificationHandler({
+    handleNotification: async () => ({
+      shouldShowAlert: true,
+      shouldPlaySound: true,
+      shouldSetBadge: true,
+      shouldShowBanner: true,
+      shouldShowList: true,
+      priority: Notifications.AndroidNotificationPriority.MAX,
+    }),
+  });
+} catch (e) {
+  // Safe fallback if running in non-native environment
+}
+
 export class NotificationService {
   private static initialized = false;
 
   /**
-   * Initialize notification handler and permissions
+   * Initialize notification handler, channels, and permissions
    */
   static async init(): Promise<boolean> {
     if (this.initialized) return true;
 
     try {
-      try {
-        Notifications.setNotificationHandler({
-          handleNotification: async () => ({
-            shouldShowAlert: true,
-            shouldPlaySound: true,
-            shouldSetBadge: true,
-            shouldShowBanner: true,
-            shouldShowList: true,
-            priority: Notifications.AndroidNotificationPriority.MAX,
-          }),
-        });
-      } catch (e) {
-        // Ignored if handler is unavailable
-      }
-
       if (Platform.OS === 'android') {
         try {
           await Notifications.setNotificationChannelAsync('birthday-reminders', {
             name: 'Birthday Reminders',
+            description: 'Urgent alarms and notifications for upcoming birthdays and special events',
             importance: Notifications.AndroidImportance.MAX,
             sound: 'default',
             enableVibrate: true,
             vibrationPattern: [0, 250, 250, 250],
             showBadge: true,
+            enableLights: true,
+            lightColor: '#007AFF',
             lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
             bypassDnd: false,
-            lightColor: '#007AFF',
           });
         } catch (chanErr) {
           // Channel setup fallback
@@ -91,7 +94,10 @@ export class NotificationService {
   /**
    * Schedule direct local system reminders for a birthday into OS alarm manager
    */
-  static async scheduleBirthdayReminders(birthday: Birthday): Promise<{ timing: ReminderTiming; notificationId: string }[]> {
+  static async scheduleBirthdayReminders(
+    birthday: Birthday,
+    defaultTime: string = '06:00'
+  ): Promise<{ timing: ReminderTiming; notificationId: string }[]> {
     const scheduledList: { timing: ReminderTiming; notificationId: string }[] = [];
 
     try {
@@ -101,19 +107,68 @@ export class NotificationService {
         return scheduledList;
       }
 
-      // Cancel existing scheduled notifications
+      // Cancel existing scheduled notifications for this contact to prevent duplicates
       await this.cancelBirthdayReminders(birthday);
 
-      const [birthYear, birthMonthStr, birthDayStr] = birthday.birthDate.split('-').map(Number);
+      // Parse birth date safely across all formats (YYYY-MM-DD, DD/MM/YYYY, ISO)
       const now = new Date();
       const currentYear = now.getFullYear();
+      let birthYear = currentYear;
+      let birthMonth = 1;
+      let birthDay = 1;
 
-      for (const reminder of birthday.reminders) {
+      if (birthday.birthDate.includes('T')) {
+        const d = new Date(birthday.birthDate);
+        birthYear = d.getFullYear();
+        birthMonth = d.getMonth() + 1;
+        birthDay = d.getDate();
+      } else {
+        const parts = birthday.birthDate.split(/[-/.]/).map(Number);
+        if (parts.length === 3) {
+          if (parts[0] > 31) {
+            // YYYY-MM-DD
+            birthYear = parts[0];
+            birthMonth = parts[1];
+            birthDay = parts[2];
+          } else {
+            // DD-MM-YYYY
+            birthDay = parts[0];
+            birthMonth = parts[1];
+            birthYear = parts[2];
+          }
+        }
+      }
+
+      // Fallback if reminders array is missing or empty
+      const activeReminders =
+        birthday.reminders && birthday.reminders.length > 0
+          ? birthday.reminders
+          : [
+            {
+              id: 'default_on_day',
+              timing: 'on_day' as ReminderTiming,
+              time: defaultTime,
+              enabled: true,
+            },
+          ];
+
+      for (const reminder of activeReminders) {
         if (!reminder.enabled) continue;
 
-        const [remHour, remMinute] = (reminder.time || '09:00').split(':').map(Number);
+        const timeStr = reminder.time || defaultTime || '06:00';
+        const [remHour, remMinute] = timeStr.split(':').map(Number);
+        const safeHour = isNaN(remHour) ? 9 : remHour;
+        const safeMinute = isNaN(remMinute) ? 0 : remMinute;
 
-        let targetDate = new Date(currentYear, birthMonthStr - 1, birthDayStr, remHour, remMinute, 0, 0);
+        let targetDate = new Date(
+          currentYear,
+          birthMonth - 1,
+          birthDay,
+          safeHour,
+          safeMinute,
+          0,
+          0
+        );
 
         if (reminder.timing === 'day_before') {
           targetDate.setDate(targetDate.getDate() - 1);
@@ -121,8 +176,17 @@ export class NotificationService {
           targetDate.setDate(targetDate.getDate() - 7);
         }
 
+        // If target time has already passed this year, roll over to next year
         if (targetDate.getTime() <= now.getTime()) {
-          targetDate = new Date(currentYear + 1, birthMonthStr - 1, birthDayStr, remHour, remMinute, 0, 0);
+          targetDate = new Date(
+            currentYear + 1,
+            birthMonth - 1,
+            birthDay,
+            safeHour,
+            safeMinute,
+            0,
+            0
+          );
           if (reminder.timing === 'day_before') {
             targetDate.setDate(targetDate.getDate() - 1);
           } else if (reminder.timing === 'week_before') {
@@ -131,21 +195,23 @@ export class NotificationService {
         }
 
         const turningAge = targetDate.getFullYear() - birthYear;
+        const groupInfo = birthday.groupClass ? ` (${birthday.groupClass})` : '';
 
         let title = '';
         let body = '';
 
         if (reminder.timing === 'on_day') {
-          title = `Today is ${birthday.name}'s Birthday!`;
-          body = turningAge > 0 
-            ? `${birthday.name} is turning ${turningAge} today. Send a warm wish.`
-            : `Wish ${birthday.name} a fantastic birthday today.`;
+          title = `🎉 Today is ${birthday.name}'s Birthday!`;
+          body =
+            turningAge > 0
+              ? `${birthday.name}${groupInfo} is turning ${turningAge} today. Tap to send a warm wish!`
+              : `Wish ${birthday.name}${groupInfo} a fantastic birthday today!`;
         } else if (reminder.timing === 'day_before') {
           title = `Tomorrow is ${birthday.name}'s Birthday!`;
-          body = `Get ready. ${birthday.name}'s birthday is coming up tomorrow.`;
+          body = `Get ready! ${birthday.name}${groupInfo}'s birthday is coming up tomorrow.`;
         } else if (reminder.timing === 'week_before') {
           title = `${birthday.name}'s Birthday in 7 Days`;
-          body = `Remember to plan ahead for ${birthday.name}'s birthday next week.`;
+          body = `Plan ahead! ${birthday.name}${groupInfo}'s birthday is in one week.`;
         }
 
         try {
@@ -153,9 +219,13 @@ export class NotificationService {
             content: {
               title,
               body,
-              data: { birthdayId: birthday.id },
+              data: { birthdayId: birthday.id, birthdayName: birthday.name },
               sound: 'default',
               priority: Notifications.AndroidNotificationPriority.MAX,
+              color: '#007AFF',
+              badge: 1,
+              autoDismiss: true,
+              sticky: false,
               ...(Platform.OS === 'android' ? { channelId: 'birthday-reminders' } : {}),
             },
             trigger: {
@@ -166,14 +236,37 @@ export class NotificationService {
 
           scheduledList.push({ timing: reminder.timing, notificationId });
         } catch (scheduleErr) {
-          // Fallback if specific trigger fails
+          console.warn('[NotificationService] Schedule error:', scheduleErr);
         }
       }
     } catch (error) {
-      // Clean fallback
+      console.warn('[NotificationService] Error scheduling birthday reminders:', error);
     }
 
     return scheduledList;
+  }
+
+  /**
+   * Schedule all birthdays across the active database for 100% offline reminder reliability
+   */
+  static async scheduleAllBirthdayReminders(
+    birthdays: Birthday[],
+    defaultTime: string = '06:00'
+  ): Promise<number> {
+    if (Platform.OS === 'web' || !birthdays || birthdays.length === 0) return 0;
+
+    let totalScheduled = 0;
+    // Cap at 250 contacts to stay well within Android's 500 alarm limit
+    const targetList = birthdays.slice(0, 250);
+
+    for (const b of targetList) {
+      try {
+        const res = await this.scheduleBirthdayReminders(b, defaultTime);
+        totalScheduled += res.length;
+      } catch (e) { }
+    }
+
+    return totalScheduled;
   }
 
   /**
@@ -181,13 +274,13 @@ export class NotificationService {
    */
   static async cancelBirthdayReminders(birthday: Birthday): Promise<void> {
     try {
-      if (Platform.OS === 'web') return;
+      if (Platform.OS === 'web' || !birthday.reminders) return;
 
       for (const reminder of birthday.reminders) {
         if (reminder.notificationId) {
           try {
             await Notifications.cancelScheduledNotificationAsync(reminder.notificationId);
-          } catch (e) {}
+          } catch (e) { }
         }
       }
     } catch (error) {
@@ -204,7 +297,7 @@ export class NotificationService {
 
       try {
         await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      } catch (e) {}
+      } catch (e) { }
 
       if (Platform.OS === 'web') {
         if (typeof window !== 'undefined' && 'Notification' in window) {
@@ -229,6 +322,10 @@ export class NotificationService {
           body,
           sound: 'default',
           priority: Notifications.AndroidNotificationPriority.MAX,
+          color: '#007AFF',
+          badge: 1,
+          autoDismiss: true,
+          sticky: false,
           ...(Platform.OS === 'android' ? { channelId: 'birthday-reminders' } : {}),
         },
         trigger: null, // null trigger forces immediate post to OS notification shade

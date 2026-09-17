@@ -95,12 +95,11 @@ export const BirthdayProvider: React.FC<{ children: React.ReactNode }> = ({ chil
           setLoading(false);
         }
 
-        // Schedule system notifications for nearest upcoming birthdays in background
-        const sorted = sortBirthdaysUpcoming(cachedBirthdays);
-        const topUpcoming = sorted.slice(0, 30);
-        for (const b of topUpcoming) {
-          NotificationService.scheduleBirthdayReminders(b).catch(() => {});
-        }
+        // Schedule system notifications for all birthdays across the database in background
+        NotificationService.scheduleAllBirthdayReminders(
+          cachedBirthdays,
+          cachedSettings.defaultReminderTime || '06:00'
+        ).catch(() => { });
       } catch (err) {
         console.warn('[BirthdayContext] Load error:', err);
         if (isMounted) setLoading(false);
@@ -155,7 +154,7 @@ export const BirthdayProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       cache.set(STORAGE_KEY_BIRTHDAYS, updated);
 
       // Non-blocking background notification scheduling (instant UI save)
-      NotificationService.scheduleBirthdayReminders(newBirthday).catch(() => {});
+      NotificationService.scheduleBirthdayReminders(newBirthday).catch(() => { });
 
       return newBirthday;
     },
@@ -202,7 +201,7 @@ export const BirthdayProvider: React.FC<{ children: React.ReactNode }> = ({ chil
           importedCount: newBirthdays.length > 0 ? newBirthdays.length : items.length,
           lastSyncedAt: now,
           createdAt: now,
-        }).then(() => refreshSavedSources()).catch(() => {});
+        }).then(() => refreshSavedSources()).catch(() => { });
       }
 
       if (newBirthdays.length === 0) return 0;
@@ -211,12 +210,11 @@ export const BirthdayProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       setBirthdays(updated);
       cache.set(STORAGE_KEY_BIRTHDAYS, updated);
 
-      // Schedule system notifications in background for the top 30 nearest birthdays
-      const sorted = sortBirthdaysUpcoming(updated);
-      const topUpcoming = sorted.slice(0, 30);
-      for (const b of topUpcoming) {
-        NotificationService.scheduleBirthdayReminders(b).catch(() => {});
-      }
+      // Schedule system notifications for all contacts in background
+      NotificationService.scheduleAllBirthdayReminders(
+        updated,
+        settings.defaultReminderTime || '06:00'
+      ).catch(() => { });
 
       return newBirthdays.length;
     },
@@ -275,7 +273,7 @@ export const BirthdayProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       cache.set(STORAGE_KEY_BIRTHDAYS, updated);
 
       // Non-blocking background notification re-scheduling
-      NotificationService.scheduleBirthdayReminders(patched).catch(() => {});
+      NotificationService.scheduleBirthdayReminders(patched).catch(() => { });
     },
     [birthdays]
   );
@@ -284,7 +282,7 @@ export const BirthdayProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     async (id: string): Promise<void> => {
       const target = birthdays.find((b) => b.id === id);
       if (target) {
-        NotificationService.cancelBirthdayReminders(target).catch(() => {});
+        NotificationService.cancelBirthdayReminders(target).catch(() => { });
       }
 
       const updated = birthdays.filter((b) => b.id !== id);
@@ -298,7 +296,7 @@ export const BirthdayProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     async (name: string): Promise<string> => {
       const trimmed = name.trim();
       if (!trimmed) return '';
-      
+
       const standardCats = ['student', 'family', 'friend', 'work', 'other'];
       if (standardCats.includes(trimmed.toLowerCase())) {
         return trimmed.toLowerCase();
@@ -341,9 +339,23 @@ export const BirthdayProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     setSettings((prev) => {
       const next = { ...prev, ...newSettings };
       cache.set(STORAGE_KEY_SETTINGS, next);
+
+      // If default reminder time or sound changed, refresh background alarms
+      if (
+        newSettings.defaultReminderTime ||
+        newSettings.notifyOnDay !== undefined ||
+        newSettings.notifyDayBefore !== undefined ||
+        newSettings.notifyWeekBefore !== undefined ||
+        newSettings.notificationSound !== undefined
+      ) {
+        NotificationService.scheduleAllBirthdayReminders(
+          birthdays,
+          next.defaultReminderTime || '09:00'
+        ).catch(() => { });
+      }
       return next;
     });
-  }, []);
+  }, [birthdays]);
 
   const triggerSystemNotificationTest = useCallback(async (): Promise<boolean> => {
     SoundService.playSound(settings.notificationSound || 'default');
@@ -354,10 +366,11 @@ export const BirthdayProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   }, [settings.notificationSound]);
 
   const refreshNotifications = useCallback(async (): Promise<void> => {
-    for (const b of birthdays) {
-      await NotificationService.scheduleBirthdayReminders(b);
-    }
-  }, [birthdays]);
+    await NotificationService.scheduleAllBirthdayReminders(
+      birthdays,
+      settings.defaultReminderTime || '06:00'
+    );
+  }, [birthdays, settings.defaultReminderTime]);
 
   return (
     <BirthdayContext.Provider
