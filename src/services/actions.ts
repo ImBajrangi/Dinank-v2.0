@@ -83,15 +83,17 @@ export class ActionService {
     const clean = phoneNumber.replace(/[^0-9+]/g, '');
     const url = `tel:${clean}`;
     try {
-      const can = await Linking.canOpenURL(url).catch(() => false);
-      if (can) {
-        await Linking.openURL(url);
-        return true;
-      } else {
-        Alert.alert('Dialer Unavailable', 'Phone dialer could not be launched on this device.');
-        return false;
-      }
+      // Direct openURL to bypass Android 11+ Package Visibility query restrictions
+      await Linking.openURL(url);
+      return true;
     } catch (err) {
+      try {
+        if (Platform.OS === 'ios') {
+          await Linking.openURL(`telprompt:${clean}`);
+          return true;
+        }
+      } catch (e2) {}
+      Alert.alert('Dialer Unavailable', `Could not launch phone dialer for ${clean}.`);
       return false;
     }
   }
@@ -109,37 +111,46 @@ export class ActionService {
     } catch (e) { }
 
     const msg = message || `Happy Birthday ${name || ''}! Wishing you a wonderful celebration today!`;
-    const cleanPhone = phoneNumber ? phoneNumber.replace(/[^0-9]/g, '') : '';
     const encoded = encodeURIComponent(msg);
 
-    let url = '';
-    if (cleanPhone) {
-      url = `whatsapp://send?phone=${cleanPhone}&text=${encoded}`;
-    } else {
-      url = `whatsapp://send?text=${encoded}`;
+    // Format phone number: remove non-digits
+    let cleanPhone = phoneNumber ? phoneNumber.replace(/[^0-9]/g, '') : '';
+    // Standard 10-digit Indian numbers require 91 prefix for WhatsApp API/deep-links
+    if (cleanPhone.length === 10) {
+      cleanPhone = `91${cleanPhone}`;
     }
 
-    try {
-      const canOpen = await Linking.canOpenURL(url).catch(() => false);
-      if (canOpen) {
-        await Linking.openURL(url);
+    if (!cleanPhone) {
+      // If no phone number provided, launch WhatsApp or Share sheet
+      try {
+        await Linking.openURL(`whatsapp://send?text=${encoded}`);
         return true;
-      } else {
-        // Fallback to web link or system share
-        if (cleanPhone) {
-          const webUrl = `https://wa.me/${cleanPhone}?text=${encoded}`;
-          const canWeb = await Linking.canOpenURL(webUrl).catch(() => false);
-          if (canWeb) {
-            await Linking.openURL(webUrl);
-            return true;
-          }
-        }
+      } catch (err) {
         await Share.share({ message: msg });
         return true;
       }
-    } catch (e) {
-      await Share.share({ message: msg });
+    }
+
+    const whatsappDirectUrl = `whatsapp://send?phone=${cleanPhone}&text=${encoded}`;
+    const waMeUrl = `https://wa.me/${cleanPhone}?text=${encoded}`;
+    const apiWhatsAppUrl = `https://api.whatsapp.com/send?phone=${cleanPhone}&text=${encoded}`;
+
+    try {
+      await Linking.openURL(whatsappDirectUrl);
       return true;
+    } catch (e1) {
+      try {
+        await Linking.openURL(waMeUrl);
+        return true;
+      } catch (e2) {
+        try {
+          await Linking.openURL(apiWhatsAppUrl);
+          return true;
+        } catch (e3) {
+          await Share.share({ message: msg });
+          return true;
+        }
+      }
     }
   }
 
@@ -162,14 +173,8 @@ export class ActionService {
     const url = cleanPhone ? `sms:${cleanPhone}${separator}body=${encoded}` : `sms:${separator}body=${encoded}`;
 
     try {
-      const can = await Linking.canOpenURL(url).catch(() => false);
-      if (can) {
-        await Linking.openURL(url);
-        return true;
-      } else {
-        await Share.share({ message: msg });
-        return true;
-      }
+      await Linking.openURL(url);
+      return true;
     } catch (e) {
       await Share.share({ message: msg });
       return true;
@@ -198,43 +203,51 @@ export class ActionService {
     const url = `mailto:${email.trim()}?subject=${encodeURIComponent(sub)}&body=${encodeURIComponent(bod)}`;
 
     try {
-      const can = await Linking.canOpenURL(url).catch(() => false);
-      if (can) {
-        await Linking.openURL(url);
-        return true;
-      } else {
-        Alert.alert('Mail App Unavailable', 'No default email app found on device.');
-        return false;
-      }
+      await Linking.openURL(url);
+      return true;
     } catch (e) {
+      Alert.alert('Mail App Unavailable', 'No default email app found on device.');
       return false;
     }
   }
 
   /**
-   * Share formatted birthday card
+   * Share formatted birthday card message
    */
-  static async shareContact(birthday: CalculatedBirthday): Promise<void> {
+  static async shareContact(birthday: CalculatedBirthday, senderName?: string): Promise<void> {
     try {
       Haptics.selectionAsync();
     } catch (e) { }
 
     const [, m, d] = birthday.birthDate.split('-');
-    const formatted = `${d}/${m}`;
-    const info = [
-      `${birthday.name}'s Birthday Reminder`,
-      `Date: ${formatted} (Turning ${birthday.nextAge})`,
-      birthday.groupClass ? `Group/Class: ${birthday.groupClass}` : null,
-      birthday.phone ? `Phone: ${birthday.phone}` : null,
-      birthday.notes ? `Note: ${birthday.notes}` : null,
+    const monthNames = [
+      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+    ];
+    const formatted = `${parseInt(d, 10)} ${monthNames[parseInt(m, 10) - 1]}`;
+    const ageText = birthday.nextAge ? ` (Turning ${birthday.nextAge})` : '';
+    const classInfo = [
+      birthday.groupClass ? `Class ${birthday.groupClass}` : null,
+      birthday.section ? `Sec ${birthday.section}` : null,
     ]
       .filter(Boolean)
-      .join('\n');
+      .join(' • ');
+
+    const cardGreeting = this.formatCategoryGreeting(birthday, senderName);
+
+    const message = `🎂 *HAPPY BIRTHDAY ${birthday.name.toUpperCase()}!* 🎉${ageText}
+📅 *Date:* ${formatted}${classInfo ? `\n📚 *${classInfo}*` : ''}
+
+${cardGreeting}
+
+━━━━━━━━━━━━━━━━━━━━━
+📲 *Shared with Dinank*
+_Never miss a birthday, anniversary or special moment._`;
 
     try {
       await Share.share({
-        title: `${birthday.name}'s Birthday`,
-        message: info,
+        title: `Birthday Greeting for ${birthday.name}`,
+        message: message,
       });
     } catch (e) { }
   }

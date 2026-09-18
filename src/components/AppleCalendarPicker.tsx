@@ -24,6 +24,17 @@ const MONTH_NAMES = [
 
 const WEEKDAYS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
 
+const DECADES = [
+  { id: 'all', label: 'All' },
+  { id: '2020', label: '2020s' },
+  { id: '2010', label: '2010s' },
+  { id: '2000', label: '2000s' },
+  { id: '1990', label: '1990s' },
+  { id: '1980', label: '1980s' },
+  { id: '1970', label: '1970s' },
+  { id: 'older', label: 'Older' },
+];
+
 export const AppleCalendarPicker: React.FC<AppleCalendarPickerProps> = ({
   month,
   day,
@@ -32,6 +43,7 @@ export const AppleCalendarPicker: React.FC<AppleCalendarPickerProps> = ({
 }) => {
   const { colors, isDark } = useBirthdays();
   const [viewMode, setViewMode] = useState<'calendar' | 'years'>('calendar');
+  const [selectedDecade, setSelectedDecade] = useState<string>('all');
 
   const currentYearNum = parseInt(year, 10) || new Date().getFullYear();
 
@@ -65,6 +77,14 @@ export const AppleCalendarPicker: React.FC<AppleCalendarPickerProps> = ({
     }
     return yrs;
   }, []);
+
+  const filteredYears = useMemo(() => {
+    if (selectedDecade === 'all') return availableYears;
+    if (selectedDecade === 'older') return availableYears.filter((y) => y < 1970);
+    const start = parseInt(selectedDecade, 10);
+    const end = start + 9;
+    return availableYears.filter((y) => y >= start && y <= end);
+  }, [availableYears, selectedDecade]);
 
   const handlePrevMonth = () => {
     try {
@@ -155,14 +175,63 @@ export const AppleCalendarPicker: React.FC<AppleCalendarPickerProps> = ({
       </View>
 
       {viewMode === 'years' ? (
-        /* Compact Year Grid (4-columns) */
+        /* Year Picker with Decade Navigation */
         <View style={styles.yearPickerContainer}>
+          {/* Decade quick filter tabs */}
           <ScrollView
+            horizontal
+            nestedScrollEnabled={true}
+            showsHorizontalScrollIndicator={false}
+            style={styles.decadeScroll}
+            contentContainerStyle={styles.decadeRow}
+          >
+            {DECADES.map((dec) => {
+              const isDecSelected = selectedDecade === dec.id;
+              return (
+                <TouchableOpacity
+                  key={dec.id}
+                  activeOpacity={0.7}
+                  onPress={() => {
+                    try {
+                      Haptics.selectionAsync();
+                    } catch (e) {}
+                    setSelectedDecade(dec.id);
+                  }}
+                  style={[
+                    styles.decadePill,
+                    {
+                      backgroundColor: isDecSelected
+                        ? colors.accent
+                        : isDark
+                        ? '#2C2C2E'
+                        : '#E5E5EA',
+                    },
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.decadeText,
+                      {
+                        color: isDecSelected ? '#FFFFFF' : colors.textPrimary,
+                        fontWeight: isDecSelected ? '700' : '500',
+                      },
+                    ]}
+                  >
+                    {dec.label}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
+
+          {/* 4-column year grid with nestedScrollEnabled */}
+          <ScrollView
+            nestedScrollEnabled={true}
             style={styles.yearScroll}
             contentContainerStyle={styles.yearGrid}
-            showsVerticalScrollIndicator={false}
+            showsVerticalScrollIndicator={true}
           >
-            {availableYears.map((y) => {
+            {filteredYears.map((y) => {
               const isSelected = y === currentYearNum;
               return (
                 <TouchableOpacity
@@ -326,21 +395,39 @@ const styles = StyleSheet.create({
   yearPickerContainer: {
     paddingVertical: 4,
   },
+  decadeScroll: {
+    marginBottom: 8,
+  },
+  decadeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 2,
+  },
+  decadePill: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 12,
+  },
+  decadeText: {
+    fontSize: 12,
+  },
   yearScroll: {
-    maxHeight: 140,
+    maxHeight: 180,
   },
   yearGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 6,
     justifyContent: 'space-between',
-    paddingBottom: 4,
+    paddingBottom: 8,
   },
   yearPill: {
     width: '23%',
-    paddingVertical: 7,
-    borderRadius: 7,
+    paddingVertical: 8,
+    borderRadius: 8,
     alignItems: 'center',
+    justifyContent: 'center',
   },
   yearText: {
     fontSize: 13,

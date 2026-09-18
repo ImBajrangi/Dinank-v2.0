@@ -40,7 +40,7 @@ export class NotificationService {
             vibrationPattern: [0, 250, 250, 250],
             showBadge: true,
             enableLights: true,
-            lightColor: '#007AFF',
+            lightColor: '#000000',
             lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
             bypassDnd: false,
           });
@@ -155,10 +155,12 @@ export class NotificationService {
       for (const reminder of activeReminders) {
         if (!reminder.enabled) continue;
 
-        const timeStr = reminder.time || defaultTime || '06:00';
+        const timeStr = reminder.time || defaultTime || '09:00';
         const [remHour, remMinute] = timeStr.split(':').map(Number);
         const safeHour = isNaN(remHour) ? 9 : remHour;
         const safeMinute = isNaN(remMinute) ? 0 : remMinute;
+
+        const isBirthdayToday = birthMonth === (now.getMonth() + 1) && birthDay === now.getDate();
 
         let targetDate = new Date(
           currentYear,
@@ -176,7 +178,8 @@ export class NotificationService {
           targetDate.setDate(targetDate.getDate() - 7);
         }
 
-        // If target time has already passed this year, roll over to next year
+        // If the scheduled reminder time has already passed (whether today or earlier in the year),
+        // roll over targetDate to the next year's cycle so the phone does NOT spam notifications on every app refresh
         if (targetDate.getTime() <= now.getTime()) {
           targetDate = new Date(
             currentYear + 1,
@@ -215,6 +218,23 @@ export class NotificationService {
         }
 
         try {
+          const diffSeconds = Math.round((targetDate.getTime() - Date.now()) / 1000);
+          let triggerConfig: any;
+
+          if (diffSeconds < 60) {
+            triggerConfig = {
+              type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
+              seconds: Math.max(5, diffSeconds),
+              channelId: 'birthday-reminders',
+            };
+          } else {
+            triggerConfig = {
+              type: Notifications.SchedulableTriggerInputTypes.DATE,
+              date: targetDate,
+              channelId: 'birthday-reminders',
+            };
+          }
+
           const notificationId = await Notifications.scheduleNotificationAsync({
             content: {
               title,
@@ -222,16 +242,13 @@ export class NotificationService {
               data: { birthdayId: birthday.id, birthdayName: birthday.name },
               sound: 'default',
               priority: Notifications.AndroidNotificationPriority.MAX,
-              color: '#007AFF',
+              color: '#000000',
               badge: 1,
               autoDismiss: true,
               sticky: false,
               ...(Platform.OS === 'android' ? { channelId: 'birthday-reminders' } : {}),
             },
-            trigger: {
-              type: Notifications.SchedulableTriggerInputTypes.DATE,
-              date: targetDate,
-            },
+            trigger: triggerConfig,
           });
 
           scheduledList.push({ timing: reminder.timing, notificationId });
@@ -322,7 +339,7 @@ export class NotificationService {
           body,
           sound: 'default',
           priority: Notifications.AndroidNotificationPriority.MAX,
-          color: '#007AFF',
+          color: '#000000',
           badge: 1,
           autoDismiss: true,
           sticky: false,

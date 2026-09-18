@@ -239,7 +239,7 @@ export const AIWishModal: React.FC<AIWishModalProps> = ({
             </TouchableOpacity>
           </View>
 
-          <ScrollView style={styles.body} showsVerticalScrollIndicator={false}>
+          <ScrollView style={styles.body} showsVerticalScrollIndicator={false} nestedScrollEnabled={true}>
             {/* Tone & Saved Presets Pills */}
             <ScrollView
               horizontal
@@ -490,7 +490,9 @@ const styles = StyleSheet.create({
   sheet: {
     borderTopLeftRadius: 18,
     borderTopRightRadius: 18,
-    maxHeight: '90%',
+    height: '90%',
+    maxHeight: '92%',
+    overflow: 'hidden',
   },
   grabberWrapper: {
     alignItems: 'center',
@@ -537,16 +539,21 @@ const styles = StyleSheet.create({
   },
   toneScroll: {
     flexDirection: 'row',
+    alignItems: 'center',
     gap: 8,
     paddingVertical: 10,
   },
   tonePill: {
-    paddingHorizontal: 15,
-    paddingVertical: 7,
-    borderRadius: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 18,
   },
   tonePillText: {
     fontSize: 13,
+    lineHeight: 18,
   },
   wishCard: {
     borderRadius: 14,

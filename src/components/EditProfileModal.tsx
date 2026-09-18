@@ -109,7 +109,7 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({ visible, onC
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
       <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={styles.modalOverlay}
       >
         <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={onClose} />
@@ -124,10 +124,10 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({ visible, onC
         >
           {/* Apple Sheet Grabber Bar */}
           <View style={styles.handleContainer} {...panResponder.panHandlers}>
-            <View style={[styles.handleBar, { backgroundColor: isDark ? '#3A3A3C' : '#D1D1D6' }]} />
+            <View style={[styles.handleBar, { backgroundColor: isDark ? '#48484A' : '#C7C7CC' }]} />
           </View>
 
-          {/* Authentic Apple Navigation Bar */}
+          {/* Authentic Apple Navigation Bar: Cancel | Title | Done */}
           <View
             style={[
               styles.navHeader,
@@ -135,33 +135,30 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({ visible, onC
             ]}
             {...panResponder.panHandlers}
           >
-            <View style={styles.navSideSlot} />
+            <TouchableOpacity
+              activeOpacity={0.7}
+              onPress={onClose}
+              style={styles.navSideSlot}
+            >
+              <Text style={[styles.cancelText, { color: colors.accent }]}>Cancel</Text>
+            </TouchableOpacity>
 
             <Text style={[styles.navCenterTitle, { color: colors.textPrimary }]}>
               Sender Profile
             </Text>
 
-            <View style={styles.navSideSlot}>
-              <TouchableOpacity
-                activeOpacity={0.7}
-                onPress={() => {
-                  try {
-                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                  } catch (e) { }
-                  onClose();
-                }}
-                style={[
-                  styles.closeCircleBtn,
-                  { backgroundColor: isDark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.06)' },
-                ]}
-              >
-                <X size={15} color={colors.textSecondary} />
-              </TouchableOpacity>
-            </View>
+            <TouchableOpacity
+              activeOpacity={0.7}
+              onPress={handleSave}
+              style={[styles.navSideSlot, { alignItems: 'flex-end' }]}
+            >
+              <Text style={[styles.doneText, { color: colors.accent }]}>Done</Text>
+            </TouchableOpacity>
           </View>
 
           <ScrollView
             showsVerticalScrollIndicator={false}
+            nestedScrollEnabled={true}
             keyboardShouldPersistTaps="handled"
             automaticallyAdjustKeyboardInsets={true}
             contentContainerStyle={styles.scrollBody}
@@ -315,7 +312,8 @@ const styles = StyleSheet.create({
   modalContent: {
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
-    maxHeight: '88%',
+    height: '88%',
+    maxHeight: '92%',
     overflow: 'hidden',
   },
   handleContainer: {
@@ -333,13 +331,22 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
-    paddingVertical: 10,
+    paddingVertical: 12,
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
   navSideSlot: {
-    width: 36,
-    alignItems: 'flex-end',
+    minWidth: 60,
     justifyContent: 'center',
+  },
+  cancelText: {
+    fontSize: 17,
+    fontWeight: '400',
+    letterSpacing: -0.4,
+  },
+  doneText: {
+    fontSize: 17,
+    fontWeight: '600',
+    letterSpacing: -0.4,
   },
   navCenterTitle: {
     fontSize: 17,
@@ -347,17 +354,10 @@ const styles = StyleSheet.create({
     letterSpacing: -0.4,
     textAlign: 'center',
   },
-  closeCircleBtn: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
   scrollBody: {
     paddingHorizontal: 16,
     paddingTop: 12,
-    paddingBottom: 36,
+    paddingBottom: 100,
   },
   heroSection: {
     alignItems: 'center',

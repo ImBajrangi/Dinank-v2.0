@@ -1,4 +1,4 @@
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useState } from 'react';
 import {
   Modal,
   View,
@@ -34,6 +34,7 @@ import { useBirthdays } from '../context/BirthdayContext';
 import { RELATIONSHIP_COLORS, getCategoryStyle } from '../constants/theme';
 import { NotificationService } from '../services/notifications';
 import { ActionService } from '../services/actions';
+import { BirthdayCardModal } from './BirthdayCardModal';
 
 interface BirthdayDetailModalProps {
   visible: boolean;
@@ -56,6 +57,7 @@ export const BirthdayDetailModal: React.FC<BirthdayDetailModalProps> = ({
   onOpenAIWish,
 }) => {
   const { colors, isDark, deleteBirthday, settings } = useBirthdays();
+  const [isCardModalOpen, setIsCardModalOpen] = useState(false);
 
   const panY = useRef(new Animated.Value(0)).current;
 
@@ -441,7 +443,12 @@ export const BirthdayDetailModal: React.FC<BirthdayDetailModalProps> = ({
               {/* Share */}
               <TouchableOpacity
                 activeOpacity={0.65}
-                onPress={() => ActionService.shareContact(birthday)}
+                onPress={() => {
+                  try {
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  } catch (e) {}
+                  setIsCardModalOpen(true);
+                }}
                 style={styles.actionRow}
               >
                 <View style={[styles.actionIconBox, { backgroundColor: '#007AFF' }]}>
@@ -507,6 +514,13 @@ export const BirthdayDetailModal: React.FC<BirthdayDetailModalProps> = ({
           </ScrollView>
         </Animated.View>
       </View>
+
+      {/* Customized Birthday Card Studio Modal */}
+      <BirthdayCardModal
+        visible={isCardModalOpen}
+        onClose={() => setIsCardModalOpen(false)}
+        birthday={birthday}
+      />
     </Modal>
   );
 };

@@ -15,11 +15,12 @@ import {
   PanResponder,
 } from 'react-native';
 import * as Haptics from 'expo-haptics';
-import { Plus } from 'lucide-react-native';
+import { Plus, Clock } from 'lucide-react-native';
 import { Birthday, RelationshipType, ReminderTiming } from '../types/birthday';
 import { useBirthdays } from '../context/BirthdayContext';
 import { AppleCalendarPicker } from './AppleCalendarPicker';
 import { AppleSwitch } from './AppleSwitch';
+import { ClockTimePickerModal } from './ClockTimePickerModal';
 import { AVATAR_COLORS, RELATIONSHIP_COLORS } from '../constants/theme';
 
 interface AddBirthdayModalProps {
@@ -48,11 +49,12 @@ export const AddBirthdayModal: React.FC<AddBirthdayModalProps> = ({
   onClose,
   birthdayToEdit,
 }) => {
-  const { colors, isDark, addBirthday, updateBirthday, customCategories, addCustomCategory } =
+  const { colors, isDark, settings, addBirthday, updateBirthday, customCategories, addCustomCategory } =
     useBirthdays();
 
   const [newCategoryModalVisible, setNewCategoryModalVisible] = useState(false);
   const [newCategoryInput, setNewCategoryInput] = useState('');
+  const [isClockPickerOpen, setIsClockPickerOpen] = useState(false);
 
   const now = new Date();
   const [name, setName] = useState('');
@@ -73,7 +75,7 @@ export const AddBirthdayModal: React.FC<AddBirthdayModalProps> = ({
   const [notifyOnDay, setNotifyOnDay] = useState(true);
   const [notifyDayBefore, setNotifyDayBefore] = useState(true);
   const [notifyWeekBefore, setNotifyWeekBefore] = useState(false);
-  const [reminderTime, setReminderTime] = useState('09:00');
+  const [reminderTime, setReminderTime] = useState(settings.defaultReminderTime || '09:00');
 
   useEffect(() => {
     if (birthdayToEdit) {
@@ -268,7 +270,7 @@ export const AddBirthdayModal: React.FC<AddBirthdayModalProps> = ({
             </TouchableOpacity>
           </View>
 
-          <ScrollView style={styles.body} showsVerticalScrollIndicator={false}>
+          <ScrollView style={styles.body} showsVerticalScrollIndicator={false} nestedScrollEnabled={true}>
             {/* Section 1: Category (First so form adapts immediately) */}
             <Text style={[styles.sectionHeader, { color: colors.textSecondary }]}>CATEGORY</Text>
             <View style={[styles.groupedBox, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}>
@@ -510,6 +512,73 @@ export const AddBirthdayModal: React.FC<AddBirthdayModalProps> = ({
                   onValueChange={(v) => setNotifyDayBefore(v)}
                 />
               </View>
+
+              <View style={[styles.divider, { backgroundColor: colors.surfaceBorder }]} />
+
+              {/* Alert Time Selector */}
+              <View style={{ paddingHorizontal: 16, paddingVertical: 10 }}>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                  <Text style={[styles.switchLabel, { color: colors.textPrimary }]}>Alert Time</Text>
+                  <TouchableOpacity
+                    activeOpacity={0.7}
+                    onPress={() => {
+                      try { Haptics.selectionAsync(); } catch (e) {}
+                      setIsClockPickerOpen(true);
+                    }}
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      backgroundColor: isDark ? '#2C2C2E' : '#E5E5EA',
+                      paddingHorizontal: 10,
+                      paddingVertical: 5,
+                      borderRadius: 8,
+                    }}
+                  >
+                    <Clock size={13} color={colors.accent} style={{ marginRight: 4 }} />
+                    <Text style={{ fontSize: 13, fontWeight: '600', color: colors.accent }}>
+                      {reminderTime}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+
+                {/* Quick Time Pills */}
+                <ScrollView
+                  horizontal
+                  nestedScrollEnabled={true}
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={{ flexDirection: 'row', gap: 6 }}
+                >
+                  {['08:00', '09:00', '12:00', '18:00', '21:00'].map((t) => {
+                    const isSelected = reminderTime === t;
+                    return (
+                      <TouchableOpacity
+                        key={t}
+                        activeOpacity={0.7}
+                        onPress={() => {
+                          try { Haptics.selectionAsync(); } catch (e) {}
+                          setReminderTime(t);
+                        }}
+                        style={{
+                          paddingHorizontal: 10,
+                          paddingVertical: 5,
+                          borderRadius: 8,
+                          backgroundColor: isSelected ? colors.accent : isDark ? '#2C2C2E' : '#E5E5EA',
+                        }}
+                      >
+                        <Text
+                          style={{
+                            fontSize: 12,
+                            fontWeight: isSelected ? '700' : '500',
+                            color: isSelected ? '#FFFFFF' : colors.textPrimary,
+                          }}
+                        >
+                          {t}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </ScrollView>
+              </View>
             </View>
 
             {/* Section 5: Notes */}
@@ -651,6 +720,15 @@ export const AddBirthdayModal: React.FC<AddBirthdayModalProps> = ({
           </View>
         </View>
       </Modal>
+
+      {/* CLOCK TIME PICKER MODAL */}
+      <ClockTimePickerModal
+        visible={isClockPickerOpen}
+        initialTime={reminderTime}
+        onClose={() => setIsClockPickerOpen(false)}
+        onSaveTime={(newTime) => setReminderTime(newTime)}
+        title="Birthday Alert Time"
+      />
     </Modal>
   );
 };

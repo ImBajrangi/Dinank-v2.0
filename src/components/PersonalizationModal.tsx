@@ -246,7 +246,7 @@ export const PersonalizationModal: React.FC<PersonalizationModalProps> = ({
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
       <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         keyboardVerticalOffset={Platform.OS === 'ios' ? 10 : 0}
         style={styles.modalOverlay}
       >
@@ -306,6 +306,7 @@ export const PersonalizationModal: React.FC<PersonalizationModalProps> = ({
             style={styles.scrollBody}
             contentContainerStyle={styles.scrollContent}
             showsVerticalScrollIndicator={false}
+            nestedScrollEnabled={true}
             keyboardShouldPersistTaps="handled"
           >
             {/* Category Switcher Pills */}
@@ -569,9 +570,11 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   modalContent: {
-    borderTopLeftRadius: 18,
-    borderTopRightRadius: 18,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    height: '90%',
     maxHeight: '92%',
+    overflow: 'hidden',
   },
   handleContainer: {
     alignItems: 'center',
@@ -615,6 +618,7 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     paddingTop: 4,
+    paddingBottom: 40,
   },
   categoryRow: {
     flexDirection: 'row',
