@@ -7,7 +7,6 @@ import {
   TouchableOpacity,
   ScrollView,
   StyleSheet,
-  Alert,
   Animated,
   PanResponder,
   Share,
@@ -26,6 +25,7 @@ import {
   ChevronUp,
 } from 'lucide-react-native';
 import { useBirthdays } from '../context/BirthdayContext';
+import { useAlert } from '../context/AlertContext';
 import { Birthday } from '../types/birthday';
 
 interface ExportModalProps {
@@ -35,6 +35,7 @@ interface ExportModalProps {
 
 export const ExportModal: React.FC<ExportModalProps> = ({ visible, onClose }) => {
   const { colors, isDark, birthdays, customCategories } = useBirthdays();
+  const { showWarning, showError } = useAlert();
 
   const [activeCategory, setActiveCategory] = useState<string>('all');
   const [selectedContactIds, setSelectedContactIds] = useState<Set<string>>(new Set());
@@ -170,7 +171,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({ visible, onClose }) =>
   const handleExecuteExport = async () => {
     const targets = birthdays.filter((b) => selectedContactIds.has(b.id));
     if (targets.length === 0) {
-      Alert.alert('No Contacts Selected', 'Please select at least one contact to export.');
+      showWarning('No Contacts Selected', 'Please select at least one contact to export.');
       return;
     }
 
@@ -189,7 +190,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({ visible, onClose }) =>
     ].filter((c) => columns[c.id]);
 
     if (activeCols.length === 0) {
-      Alert.alert('No Columns Selected', 'Please select at least one field/column to include.');
+      showWarning('No Columns Selected', 'Please select at least one field/column to include.');
       return;
     }
 
@@ -210,7 +211,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({ visible, onClose }) =>
       });
       onClose();
     } catch (e) {
-      Alert.alert('Export Failed', 'Could not share CSV data.');
+      showError('Export Failed', 'Could not share CSV data.');
     }
   };
 

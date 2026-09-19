@@ -7,7 +7,6 @@ import {
   TouchableOpacity,
   ScrollView,
   StyleSheet,
-  Alert,
   KeyboardAvoidingView,
   Platform,
   ActivityIndicator,
@@ -41,6 +40,7 @@ import {
   ExternalLink,
 } from 'lucide-react-native';
 import { useBirthdays } from '../context/BirthdayContext';
+import { useAlert } from '../context/AlertContext';
 import { RelationshipType } from '../types/birthday';
 import {
   ImporterService,
@@ -86,6 +86,7 @@ const SEGREGATION_OPTIONS: { id: SegregationDimension; label: string; icon: any 
 export const ImportModal: React.FC<ImportModalProps> = ({ visible, onClose }) => {
   const { colors, isDark, addBirthday, addMultipleBirthdays, customCategories, addCustomCategory } =
     useBirthdays();
+  const { showWarning, showError, showAlert } = useAlert();
 
   const [activeTab, setActiveTab] = useState<'file' | 'sheet' | 'text'>('file');
   const [csvText, setCsvText] = useState('');
@@ -227,7 +228,7 @@ export const ImportModal: React.FC<ImportModalProps> = ({ visible, onClose }) =>
 
       setPickedFiles((prev) => [...prev, ...newFiles]);
     } catch (e: any) {
-      Alert.alert('File Error', `Failed to open document: ${e.message || String(e)}`);
+      showError('File Error', `Failed to open document: ${e.message || String(e)}`);
     }
   };
 
@@ -256,7 +257,7 @@ export const ImportModal: React.FC<ImportModalProps> = ({ visible, onClose }) =>
   const handleAddSheetLink = () => {
     const url = newSheetUrlInput.trim();
     if (!url || url.length < 5) {
-      Alert.alert('Invalid URL', 'Please enter a valid Google Sheets URL.');
+      showWarning('Invalid URL', 'Please enter a valid Google Sheets URL.');
       return;
     }
 
@@ -317,7 +318,7 @@ export const ImportModal: React.FC<ImportModalProps> = ({ visible, onClose }) =>
    */
   const handleParseFiles = async () => {
     if (pickedFiles.length === 0) {
-      Alert.alert('No Files Selected', 'Please select one or more spreadsheet files.');
+      showWarning('No Files Selected', 'Please select one or more spreadsheet files.');
       return;
     }
 
@@ -341,7 +342,7 @@ export const ImportModal: React.FC<ImportModalProps> = ({ visible, onClose }) =>
       const allIds = new Set(parsed.successful.map((item) => item.id));
       setSelectedContactIds(allIds);
     } catch (e: any) {
-      Alert.alert('Parsing Error', `Failed to parse files: ${e.message || String(e)}`);
+      showError('Parsing Error', `Failed to parse files: ${e.message || String(e)}`);
     } finally {
       setIsLoading(false);
     }
@@ -357,7 +358,7 @@ export const ImportModal: React.FC<ImportModalProps> = ({ visible, onClose }) =>
     }
 
     if (urlsToFetch.length === 0) {
-      Alert.alert('Empty URL', 'Please add at least one public Google Sheet URL.');
+      showWarning('Empty URL', 'Please add at least one public Google Sheet URL.');
       return;
     }
 
@@ -373,7 +374,7 @@ export const ImportModal: React.FC<ImportModalProps> = ({ visible, onClose }) =>
       const allIds = new Set(parsed.successful.map((item) => item.id));
       setSelectedContactIds(allIds);
     } catch (e: any) {
-      Alert.alert('Import Error', `Failed to fetch sheets: ${e.message || String(e)}`);
+      showError('Import Error', `Failed to fetch sheets: ${e.message || String(e)}`);
     } finally {
       setIsLoading(false);
     }
@@ -384,7 +385,7 @@ export const ImportModal: React.FC<ImportModalProps> = ({ visible, onClose }) =>
    */
   const handleParsePastedData = () => {
     if (!csvText.trim()) {
-      Alert.alert('Empty Input', 'Please paste CSV data with columns: Name, Date of Birth');
+      showWarning('Empty Input', 'Please paste CSV data with columns: Name, Date of Birth');
       return;
     }
 
@@ -443,14 +444,16 @@ export const ImportModal: React.FC<ImportModalProps> = ({ visible, onClose }) =>
   };
 
   const handleDeleteSource = (sourceName: string) => {
-    Alert.alert(
-      'Delete Source Batch?',
-      `Remove all contacts originating from '${sourceName}'?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
+    showAlert({
+      title: 'Delete Source Batch?',
+      message: `Remove all contacts originating from '${sourceName}'?`,
+      icon: 'trash',
+      type: 'action_sheet',
+      actions: [
         {
-          text: 'Delete',
+          text: `Delete '${sourceName}' Contacts`,
           style: 'destructive',
+          icon: 'trash',
           onPress: () => {
             try {
               Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -479,8 +482,9 @@ export const ImportModal: React.FC<ImportModalProps> = ({ visible, onClose }) =>
             });
           },
         },
-      ]
-    );
+        { text: 'Cancel', style: 'cancel' },
+      ],
+    });
   };
 
   const handleDeleteIndividualContact = (id: string, name: string) => {
@@ -579,7 +583,7 @@ export const ImportModal: React.FC<ImportModalProps> = ({ visible, onClose }) =>
     );
 
     if (itemsToImport.length === 0) {
-      Alert.alert('No Contacts Selected', 'Please select at least one contact to import.');
+      showWarning('No Contacts Selected', 'Please select at least one contact to import.');
       return;
     }
 
@@ -631,13 +635,22 @@ export const ImportModal: React.FC<ImportModalProps> = ({ visible, onClose }) =>
     const addedCount = await addMultipleBirthdays(batchPayload, sourceMeta);
     setIsLoading(false);
 
-    Alert.alert(
-      'Import Successful',
-      addedCount > 0
-        ? `Successfully added ${addedCount} ${targetCategory} birthdays into your reminder list.`
-        : 'Selected contacts are already in your reminder list (no duplicates created).',
-      [{ text: 'Done', onPress: handleClose }]
-    );
+    showAlert({
+      title: 'Import Successful',
+      message:
+        addedCount > 0
+          ? `Successfully added ${addedCount} ${targetCategory} birthdays into your reminder list.`
+          : 'Selected contacts are already in your reminder list (no duplicates created).',
+      icon: 'success',
+      type: 'dialog',
+      actions: [
+        {
+          text: 'Done',
+          style: 'primary',
+          onPress: handleClose,
+        },
+      ],
+    });
   };
 
   const cardBg = isDark ? '#1C1C1E' : '#FFFFFF';

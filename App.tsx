@@ -21,7 +21,7 @@ import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-cont
 import * as Haptics from 'expo-haptics';
 import Svg, { Path, Rect, Circle } from 'react-native-svg';
 
-// Immediate web global style reset to eliminate all browser focus rings and outlines
+// Immediate web global style reset to eliminate all browser focus rings and apply Apple HIG typography
 if (Platform.OS === 'web' && typeof document !== 'undefined') {
   const injectGlobalStyles = () => {
     const styleId = 'global-app-styles';
@@ -38,6 +38,7 @@ if (Platform.OS === 'web' && typeof document !== 'undefined') {
         outline-width: 0 !important;
         -webkit-tap-highlight-color: transparent !important;
         -webkit-focus-ring-color: transparent !important;
+        font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
       }
       input, textarea, select, button, a, div, span, [tabindex], [role="button"], [role="textbox"], [data-focusable="true"] {
         outline: none !important;
@@ -52,15 +53,6 @@ if (Platform.OS === 'web' && typeof document !== 'undefined') {
         box-shadow: none;
       }
     `;
-    // Inject Google Font Laila and Kalam for soft Hindi typography
-    const fontId = 'google-font-laila';
-    if (!document.getElementById(fontId)) {
-      const link = document.createElement('link');
-      link.id = fontId;
-      link.rel = 'stylesheet';
-      link.href = 'https://fonts.googleapis.com/css2?family=Kalam:wght@300;400;700&family=Laila:wght@400;500;600;700&display=swap';
-      document.head.appendChild(link);
-    }
   };
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', injectGlobalStyles);
@@ -285,7 +277,7 @@ const MainApp: React.FC = () => {
 
   const bottomInset = Math.max(insets.bottom, Platform.OS === 'ios' ? 20 : 8);
 
-  // Synchronize web background with theme and load Hindi font Laila
+  // Synchronize web background with theme and apply Apple HIG typography
   React.useEffect(() => {
     if (Platform.OS === 'web' && typeof document !== 'undefined') {
       document.documentElement.style.backgroundColor = colors.background;
@@ -311,6 +303,7 @@ const MainApp: React.FC = () => {
           outline-style: none !important;
           outline-width: 0 !important;
           -webkit-tap-highlight-color: transparent !important;
+          font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
         }
         *:focus, *:focus-visible, *:focus-within {
           outline: none !important;
@@ -329,16 +322,6 @@ const MainApp: React.FC = () => {
           outline-width: 0 !important;
         }
       `;
-
-      // Inject Google Font Laila
-      const fontId = 'google-font-laila';
-      if (!document.getElementById(fontId)) {
-        const link = document.createElement('link');
-        link.id = fontId;
-        link.rel = 'stylesheet';
-        link.href = 'https://fonts.googleapis.com/css2?family=Laila:wght@500;600;700&display=swap';
-        document.head.appendChild(link);
-      }
     }
   }, [colors.background]);
 
@@ -515,11 +498,15 @@ const MainApp: React.FC = () => {
   );
 };
 
+import { AlertProvider } from './src/context/AlertContext';
+
 export default function App() {
   return (
     <SafeAreaProvider>
       <BirthdayProvider>
-        <MainApp />
+        <AlertProvider>
+          <MainApp />
+        </AlertProvider>
       </BirthdayProvider>
     </SafeAreaProvider>
   );

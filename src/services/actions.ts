@@ -1,6 +1,7 @@
-import { Linking, Alert, Share, Platform } from 'react-native';
+import { Linking, Share, Platform } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { CalculatedBirthday } from '../types/birthday';
+import { globalShowAlert } from '../context/AlertContext';
 
 export class ActionService {
   /**
@@ -73,7 +74,13 @@ export class ActionService {
    */
   static async callPhone(phoneNumber?: string, name?: string): Promise<boolean> {
     if (!phoneNumber || !phoneNumber.trim()) {
-      Alert.alert('No Phone Number', `No phone number is recorded for ${name || 'this contact'}.`);
+      globalShowAlert({
+        title: 'No Phone Number',
+        message: `No phone number is recorded for ${name || 'this contact'}.`,
+        icon: 'phone',
+        type: 'dialog',
+        actions: [{ text: 'OK', style: 'primary' }],
+      });
       return false;
     }
     try {
@@ -93,7 +100,13 @@ export class ActionService {
           return true;
         }
       } catch (e2) {}
-      Alert.alert('Dialer Unavailable', `Could not launch phone dialer for ${clean}.`);
+      globalShowAlert({
+        title: 'Dialer Unavailable',
+        message: `Could not launch phone dialer for ${clean}.`,
+        icon: 'warning',
+        type: 'dialog',
+        actions: [{ text: 'OK', style: 'primary' }],
+      });
       return false;
     }
   }
@@ -191,7 +204,13 @@ export class ActionService {
     name?: string
   ): Promise<boolean> {
     if (!email || !email.trim()) {
-      Alert.alert('No Email Address', `No email address is recorded for ${name || 'this contact'}.`);
+      globalShowAlert({
+        title: 'No Email Address',
+        message: `No email address is recorded for ${name || 'this contact'}.`,
+        icon: 'mail',
+        type: 'dialog',
+        actions: [{ text: 'OK', style: 'primary' }],
+      });
       return false;
     }
     try {
@@ -206,7 +225,13 @@ export class ActionService {
       await Linking.openURL(url);
       return true;
     } catch (e) {
-      Alert.alert('Mail App Unavailable', 'No default email app found on device.');
+      globalShowAlert({
+        title: 'Mail App Unavailable',
+        message: 'No default email app found on device.',
+        icon: 'warning',
+        type: 'dialog',
+        actions: [{ text: 'OK', style: 'primary' }],
+      });
       return false;
     }
   }

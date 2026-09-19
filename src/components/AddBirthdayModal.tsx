@@ -7,7 +7,6 @@ import {
   TouchableOpacity,
   ScrollView,
   StyleSheet,
-  Alert,
   KeyboardAvoidingView,
   Platform,
   Switch,
@@ -18,6 +17,7 @@ import * as Haptics from 'expo-haptics';
 import { Plus, Clock } from 'lucide-react-native';
 import { Birthday, RelationshipType, ReminderTiming } from '../types/birthday';
 import { useBirthdays } from '../context/BirthdayContext';
+import { useAlert } from '../context/AlertContext';
 import { AppleCalendarPicker } from './AppleCalendarPicker';
 import { AppleSwitch } from './AppleSwitch';
 import { ClockTimePickerModal } from './ClockTimePickerModal';
@@ -51,6 +51,7 @@ export const AddBirthdayModal: React.FC<AddBirthdayModalProps> = ({
 }) => {
   const { colors, isDark, settings, addBirthday, updateBirthday, customCategories, addCustomCategory } =
     useBirthdays();
+  const { showWarning } = useAlert();
 
   const [newCategoryModalVisible, setNewCategoryModalVisible] = useState(false);
   const [newCategoryInput, setNewCategoryInput] = useState('');
@@ -133,13 +134,13 @@ export const AddBirthdayModal: React.FC<AddBirthdayModalProps> = ({
 
   const handleSave = async () => {
     if (!name.trim()) {
-      Alert.alert('Name Required', 'Please enter a name for this contact.');
+      showWarning('Name Required', 'Please enter a name for this contact.');
       return;
     }
 
     const yearNum = parseInt(year, 10);
     if (isNaN(yearNum) || yearNum < 1900 || yearNum > now.getFullYear()) {
-      Alert.alert('Invalid Year', `Please enter a birth year between 1900 and ${now.getFullYear()}.`);
+      showWarning('Invalid Year', `Please enter a birth year between 1900 and ${now.getFullYear()}.`);
       return;
     }
 

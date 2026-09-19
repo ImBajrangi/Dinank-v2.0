@@ -463,10 +463,9 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   appName: {
-    fontSize: 24,
-    fontWeight: '700',
-    fontFamily: Platform.select({ web: 'Laila, serif', default: undefined }),
-    letterSpacing: 0.2,
+    fontSize: 26,
+    fontWeight: '800',
+    letterSpacing: -0.6,
     marginBottom: 4,
   },
   appTagline: {
@@ -474,6 +473,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: 12,
     lineHeight: 18,
+    letterSpacing: -0.2,
   },
   versionBadge: {
     paddingHorizontal: 12,
@@ -483,11 +483,12 @@ const styles = StyleSheet.create({
   versionText: {
     fontSize: 12,
     fontWeight: '600',
+    letterSpacing: -0.2,
   },
   sectionHeader: {
     fontSize: 11,
-    fontWeight: '600',
-    letterSpacing: 0.5,
+    fontWeight: '700',
+    letterSpacing: 0.6,
     marginBottom: 6,
     paddingHorizontal: 4,
     textTransform: 'uppercase',
@@ -536,6 +537,7 @@ const styles = StyleSheet.create({
     fontSize: 13,
     marginTop: 2,
     lineHeight: 18,
+    letterSpacing: -0.2,
   },
   actionRow: {
     flexDirection: 'row',
@@ -554,11 +556,12 @@ const styles = StyleSheet.create({
   actionTitle: {
     fontSize: 15,
     fontWeight: '600',
-    letterSpacing: -0.2,
+    letterSpacing: -0.3,
   },
   actionDesc: {
     fontSize: 12,
     marginTop: 1,
+    letterSpacing: -0.1,
   },
   divider: {
     height: StyleSheet.hairlineWidth,
@@ -587,6 +590,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
     marginTop: 1,
     lineHeight: 16,
+    letterSpacing: -0.1,
   },
   footerNote: {
     flexDirection: 'row',
@@ -596,21 +600,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
   },
   hindiBrand: {
-    fontFamily: Platform.select({
-      web: 'Laila, Kalam, "Noto Serif Devanagari", serif',
-      default: undefined,
-    }),
     fontWeight: '700',
-    fontSize: 13.5,
+    fontSize: 14,
+    letterSpacing: -0.3,
   },
   footerText: {
-    fontFamily: Platform.select({
-      web: 'Laila, Kalam, "Noto Serif Devanagari", serif',
-      default: undefined,
-    }),
     fontSize: 13,
     fontWeight: '500',
-    letterSpacing: 0.1,
+    letterSpacing: -0.2,
     textAlign: 'center',
   },
 });

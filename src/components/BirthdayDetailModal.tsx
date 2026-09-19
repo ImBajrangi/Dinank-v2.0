@@ -6,7 +6,6 @@ import {
   TouchableOpacity,
   ScrollView,
   StyleSheet,
-  Alert,
   Share,
   Linking,
   Animated,
@@ -31,6 +30,7 @@ import {
 import { CalculatedBirthday } from '../types/birthday';
 import { Avatar } from './Avatar';
 import { useBirthdays } from '../context/BirthdayContext';
+import { useAlert } from '../context/AlertContext';
 import { RELATIONSHIP_COLORS, getCategoryStyle } from '../constants/theme';
 import { NotificationService } from '../services/notifications';
 import { ActionService } from '../services/actions';
@@ -57,6 +57,7 @@ export const BirthdayDetailModal: React.FC<BirthdayDetailModalProps> = ({
   onOpenAIWish,
 }) => {
   const { colors, isDark, deleteBirthday, settings } = useBirthdays();
+  const { showAlert } = useAlert();
   const [isCardModalOpen, setIsCardModalOpen] = useState(false);
 
   const panY = useRef(new Animated.Value(0)).current;
@@ -71,7 +72,7 @@ export const BirthdayDetailModal: React.FC<BirthdayDetailModalProps> = ({
         }
       },
       onPanResponderRelease: (_, gestureState) => {
-        if (gestureState.dy > 65 || gestureState.vy > 0.5) {
+        if (gestureState.dy > 70 || gestureState.vy > 0.5) {
           try {
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
           } catch (e) {}
@@ -100,24 +101,27 @@ export const BirthdayDetailModal: React.FC<BirthdayDetailModalProps> = ({
   const relColor = getCategoryStyle(birthday.relationship);
 
   const handleDelete = () => {
-    try {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-    } catch (e) {}
-    Alert.alert(
-      'Delete Contact',
-      `Are you sure you want to remove ${birthday.name}'s birthday?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
+    showAlert({
+      type: 'action_sheet',
+      title: `Delete ${birthday.name}?`,
+      message: `Are you sure you want to remove ${birthday.name}'s birthday reminder? This cannot be undone.`,
+      icon: 'trash',
+      actions: [
         {
-          text: 'Delete',
+          text: 'Delete Contact',
           style: 'destructive',
+          icon: 'trash',
           onPress: async () => {
             await deleteBirthday(birthday.id);
             onClose();
           },
         },
-      ]
-    );
+        {
+          text: 'Cancel',
+          style: 'cancel',
+        },
+      ],
+    });
   };
 
   const handleTestSystemAlert = async () => {
@@ -132,7 +136,13 @@ export const BirthdayDetailModal: React.FC<BirthdayDetailModalProps> = ({
 
   const handleParentWhatsApp = () => {
     if (!birthday.parentPhone) {
-      Alert.alert('No Parent Phone', `No parent contact recorded for ${birthday.name}.`);
+      showAlert({
+        type: 'dialog',
+        title: 'No Parent Phone',
+        message: `No parent phone number recorded for ${birthday.name}.`,
+        icon: 'info',
+        actions: [{ text: 'OK', style: 'primary' }],
+      });
       return;
     }
     const msg = ActionService.formatParentGreeting(

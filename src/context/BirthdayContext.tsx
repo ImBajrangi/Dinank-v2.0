@@ -23,7 +23,7 @@ interface BirthdayContextType {
   addBirthday: (birthday: Omit<Birthday, 'id' | 'createdAt' | 'updatedAt'>) => Promise<Birthday>;
   addMultipleBirthdays: (
     items: Omit<Birthday, 'id' | 'createdAt' | 'updatedAt'>[],
-    sourceMeta?: { name: string; type: 'sheet' | 'file'; urlOrUri: string }
+    sourceMeta?: { id?: string; name: string; type: 'sheet' | 'file'; urlOrUri: string }
   ) => Promise<number>;
   cleanDuplicateBirthdays: () => Promise<number>;
   deleteSourceAndContacts: (sourceId: string, sourceName: string, deleteContacts: boolean) => Promise<void>;
@@ -171,7 +171,7 @@ export const BirthdayProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const addMultipleBirthdays = useCallback(
     async (
       items: Omit<Birthday, 'id' | 'createdAt' | 'updatedAt'>[],
-      sourceMeta?: { name: string; type: 'sheet' | 'file'; urlOrUri: string }
+      sourceMeta?: { id?: string; name: string; type: 'sheet' | 'file'; urlOrUri: string }
     ): Promise<number> => {
       if (!items || items.length === 0) return 0;
 
@@ -179,6 +179,8 @@ export const BirthdayProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       const existingKeys = new Set(
         birthdays.map((b) => `${b.name.trim().toLowerCase()}|${b.birthDate}|${b.rollNo || ''}`)
       );
+
+      const savedSourceId = sourceMeta?.id || (sourceMeta ? 'src_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7) : undefined);
 
       const newBirthdays: Birthday[] = [];
       for (const item of items) {
@@ -188,15 +190,17 @@ export const BirthdayProvider: React.FC<{ children: React.ReactNode }> = ({ chil
           newBirthdays.push({
             ...item,
             id: 'bday_' + Date.now() + '_' + Math.random().toString(36).substring(2, 9),
+            sourceId: item.sourceId || savedSourceId,
+            sourceName: item.sourceName || sourceMeta?.name,
             createdAt: now,
             updatedAt: now,
           });
         }
       }
 
-      if (sourceMeta) {
+      if (sourceMeta && savedSourceId) {
         SourcesService.saveSource({
-          id: 'src_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7),
+          id: savedSourceId,
           name: sourceMeta.name,
           type: sourceMeta.type,
           urlOrUri: sourceMeta.urlOrUri,
@@ -252,14 +256,25 @@ export const BirthdayProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       await refreshSavedSources();
 
       if (deleteContacts) {
-        const cleanSourceName = sourceName.trim().toLowerCase();
-        const updated = birthdays.filter((b) => {
+        const cleanSourceName = (sourceName || '').trim().toLowerCase();
+        const contactsToDelete = birthdays.filter((b) => {
+          if (b.sourceId && b.sourceId === sourceId) return true;
+          if (b.sourceName && b.sourceName.trim().toLowerCase() === cleanSourceName) return true;
           const bNotes = (b.notes || '').toLowerCase();
           const bGroup = (b.groupClass || '').toLowerCase();
-          return !bNotes.includes(cleanSourceName) && !bGroup.includes(cleanSourceName);
+          return cleanSourceName.length > 2 && (bNotes.includes(cleanSourceName) || bGroup.includes(cleanSourceName));
         });
+
+        // Cancel system notifications for removed contacts
+        contactsToDelete.forEach((c) => {
+          NotificationService.cancelBirthdayReminders(c).catch(() => { });
+        });
+
+        const toDeleteIds = new Set(contactsToDelete.map((c) => c.id));
+        const updated = birthdays.filter((b) => !toDeleteIds.has(b.id));
+
         setBirthdays(updated);
-        cache.set(STORAGE_KEY_BIRTHDAYS, updated);
+        await cache.set(STORAGE_KEY_BIRTHDAYS, updated);
       }
     },
     [birthdays, refreshSavedSources]

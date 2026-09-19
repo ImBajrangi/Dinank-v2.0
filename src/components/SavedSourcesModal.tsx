@@ -7,7 +7,6 @@ import {
   TouchableOpacity,
   ScrollView,
   StyleSheet,
-  Alert,
   Animated,
   PanResponder,
   Platform,
@@ -30,6 +29,7 @@ import {
   X,
 } from 'lucide-react-native';
 import { useBirthdays } from '../context/BirthdayContext';
+import { useAlert } from '../context/AlertContext';
 import { SavedSource, SourcesService } from '../services/sources';
 import { ImporterService } from '../services/importer';
 
@@ -54,6 +54,8 @@ export const SavedSourcesModal: React.FC<SavedSourcesModalProps> = ({
     cleanDuplicateBirthdays,
     birthdays,
   } = useBirthdays();
+
+  const { showAlert } = useAlert();
 
   const [syncingId, setSyncingId] = useState<string | null>(null);
   const [editingSource, setEditingSource] = useState<{
@@ -114,6 +116,7 @@ export const SavedSourcesModal: React.FC<SavedSourcesModalProps> = ({
         const parsed = await ImporterService.importFromGoogleSheetUrl(source.urlOrUri);
         if (parsed.successful.length > 0) {
           const added = await addMultipleBirthdays(parsed.successful, {
+            id: source.id,
             name: source.name,
             type: source.type,
             urlOrUri: source.urlOrUri,
@@ -125,17 +128,32 @@ export const SavedSourcesModal: React.FC<SavedSourcesModalProps> = ({
           });
           await refreshSavedSources();
 
-          Alert.alert(
-            'Sync Complete',
-            `Processed ${parsed.successful.length} records. ${
+          showAlert({
+            type: 'dialog',
+            title: 'Sync Complete',
+            message: `Processed ${parsed.successful.length} records. ${
               added > 0 ? `Added ${added} new contacts.` : 'All contacts are up to date.'
-            }`
-          );
+            }`,
+            icon: 'success',
+            actions: [{ text: 'Done', style: 'primary' }],
+          });
         } else {
-          Alert.alert('Sync Notice', 'No valid student contacts found in this sheet.');
+          showAlert({
+            type: 'dialog',
+            title: 'Sync Notice',
+            message: 'No valid student contacts found in this sheet.',
+            icon: 'info',
+            actions: [{ text: 'OK', style: 'default' }],
+          });
         }
       } catch (err: any) {
-        Alert.alert('Sync Failed', err.message || 'Could not fetch latest data from Google Sheet.');
+        showAlert({
+          type: 'dialog',
+          title: 'Sync Failed',
+          message: err.message || 'Could not fetch latest data from Google Sheet.',
+          icon: 'warning',
+          actions: [{ text: 'Close', style: 'default' }],
+        });
       } finally {
         setSyncingId(null);
       }
@@ -143,36 +161,50 @@ export const SavedSourcesModal: React.FC<SavedSourcesModalProps> = ({
   };
 
   const handlePromptDelete = (source: SavedSource) => {
-    try {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    } catch (e) {}
-
-    Alert.alert(
-      `Delete '${source.name}'?`,
-      'Choose whether to remove just this saved source entry or also delete its contacts from your reminder list.',
-      [
-        { text: 'Cancel', style: 'cancel' },
+    showAlert({
+      type: 'action_sheet',
+      title: `Delete '${source.name}'?`,
+      message: 'Choose whether to remove only the saved link or permanently delete its contacts.',
+      icon: 'trash',
+      actions: [
         {
-          text: 'Source Only',
-          onPress: async () => {
-            await deleteSourceAndContacts(source.id, source.name, false);
-            try {
-              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-            } catch (e) {}
-          },
-        },
-        {
-          text: 'Source & All Contacts',
+          text: 'Delete Source & All Contacts',
           style: 'destructive',
+          subtitle: 'Removes source and deletes all imported contacts from reminders',
+          icon: 'trash',
           onPress: async () => {
             await deleteSourceAndContacts(source.id, source.name, true);
-            try {
-              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-            } catch (e) {}
+            showAlert({
+              type: 'dialog',
+              title: 'Contacts Removed',
+              message: `Deleted '${source.name}' and its imported contacts.`,
+              icon: 'success',
+              actions: [{ text: 'OK', style: 'primary' }],
+            });
           },
         },
-      ]
-    );
+        {
+          text: 'Remove Source Only',
+          style: 'default',
+          subtitle: 'Removes from saved list, keeping contacts in your reminders',
+          icon: 'link',
+          onPress: async () => {
+            await deleteSourceAndContacts(source.id, source.name, false);
+            showAlert({
+              type: 'dialog',
+              title: 'Source Removed',
+              message: `Removed '${source.name}'. All contacts remain in your list.`,
+              icon: 'success',
+              actions: [{ text: 'OK', style: 'primary' }],
+            });
+          },
+        },
+        {
+          text: 'Cancel',
+          style: 'cancel',
+        },
+      ],
+    });
   };
 
   const handleOpenEdit = (source: SavedSource) => {
@@ -193,7 +225,13 @@ export const SavedSourcesModal: React.FC<SavedSourcesModalProps> = ({
     const url = editingSource.url.trim();
 
     if (!name) {
-      Alert.alert('Required', 'Please provide a name for this source.');
+      showAlert({
+        type: 'dialog',
+        title: 'Name Required',
+        message: 'Please provide a name for this source.',
+        icon: 'warning',
+        actions: [{ text: 'OK', style: 'primary' }],
+      });
       return;
     }
 
@@ -216,12 +254,21 @@ export const SavedSourcesModal: React.FC<SavedSourcesModalProps> = ({
 
     const removed = await cleanDuplicateBirthdays();
     if (removed > 0) {
-      try {
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      } catch (e) {}
-      Alert.alert('Cleanup Complete', `Successfully merged and removed ${removed} duplicate contacts.`);
+      showAlert({
+        type: 'dialog',
+        title: 'Cleanup Complete',
+        message: `Successfully merged and removed ${removed} duplicate contacts.`,
+        icon: 'success',
+        actions: [{ text: 'Done', style: 'primary' }],
+      });
     } else {
-      Alert.alert('Clean List', 'No duplicate contacts found! Your database is completely clean.');
+      showAlert({
+        type: 'dialog',
+        title: 'Clean List',
+        message: 'No duplicate contacts found! Your database is completely clean.',
+        icon: 'info',
+        actions: [{ text: 'OK', style: 'primary' }],
+      });
     }
   };
 

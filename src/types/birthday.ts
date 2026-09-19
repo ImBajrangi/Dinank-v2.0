@@ -31,6 +31,8 @@ export interface Birthday {
   email?: string;
   notes?: string;
   avatarColor?: string;
+  sourceId?: string;
+  sourceName?: string;
   reminders: ReminderOption[];
   createdAt: string;
   updatedAt: string;

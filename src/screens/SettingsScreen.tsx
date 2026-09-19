@@ -6,7 +6,6 @@ import {
   ScrollView,
   StyleSheet,
   Switch,
-  Alert,
   Share,
   Platform,
   StatusBar,
@@ -71,6 +70,7 @@ const AppleAutoIcon: React.FC<{ size?: number; color: string; style?: any }> = (
   </Svg>
 );
 import { useBirthdays } from '../context/BirthdayContext';
+import { useAlert } from '../context/AlertContext';
 import { NotificationService } from '../services/notifications';
 import { AppleSwitch } from '../components/AppleSwitch';
 import { ImporterService } from '../services/importer';
@@ -105,6 +105,8 @@ export const SettingsScreen: React.FC = () => {
     upcomingBirthdays,
   } = useBirthdays();
 
+  const { showAlert } = useAlert();
+
   const insets = useSafeAreaInsets();
   const topInset = Platform.OS === 'android' ? (StatusBar.currentHeight || 24) : insets.top;
 
@@ -130,12 +132,21 @@ export const SettingsScreen: React.FC = () => {
 
     const removed = await cleanDuplicateBirthdays();
     if (removed > 0) {
-      try {
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      } catch (e) {}
-      Alert.alert('Cleanup Complete', `Successfully merged and removed ${removed} duplicate contacts.`);
+      showAlert({
+        type: 'dialog',
+        title: 'Cleanup Complete',
+        message: `Successfully merged and removed ${removed} duplicate contacts.`,
+        icon: 'success',
+        actions: [{ text: 'Done', style: 'primary' }],
+      });
     } else {
-      Alert.alert('Clean List', 'No duplicate contacts found! Your database is completely clean.');
+      showAlert({
+        type: 'dialog',
+        title: 'Clean List',
+        message: 'No duplicate contacts found! Your database is completely clean.',
+        icon: 'info',
+        actions: [{ text: 'OK', style: 'primary' }],
+      });
     }
   };
 
@@ -151,19 +162,23 @@ export const SettingsScreen: React.FC = () => {
         setUpdateInfo(info);
         setIsUpdateModalOpen(true);
       } else {
-        Alert.alert(
-          'You’re Up to Date',
-          `Dinank v${CURRENT_APP_VERSION} is currently the latest version.`,
-          [{ text: 'OK' }]
-        );
+        showAlert({
+          type: 'dialog',
+          title: 'You’re Up to Date',
+          message: `Dinank v${CURRENT_APP_VERSION} is currently the latest version.`,
+          icon: 'success',
+          actions: [{ text: 'OK', style: 'primary' }],
+        });
       }
     } catch (err) {
       setCheckingUpdate(false);
-      Alert.alert(
-        'Check Failed',
-        'Could not verify updates at this time. Please check your internet connection.',
-        [{ text: 'OK' }]
-      );
+      showAlert({
+        type: 'dialog',
+        title: 'Check Failed',
+        message: 'Could not verify updates at this time. Please check your internet connection.',
+        icon: 'warning',
+        actions: [{ text: 'OK', style: 'default' }],
+      });
     }
   };
 
@@ -181,10 +196,13 @@ export const SettingsScreen: React.FC = () => {
     setTestingNotif(false);
 
     if (sent) {
-      Alert.alert(
-        'System Notification Dispatched',
-        'Direct local device reminder is operational.'
-      );
+      showAlert({
+        type: 'dialog',
+        title: 'System Notification Dispatched',
+        message: 'Direct local device reminder is operational in your notification tray.',
+        icon: 'success',
+        actions: [{ text: 'Great', style: 'primary' }],
+      });
     }
   };
 
@@ -195,7 +213,13 @@ export const SettingsScreen: React.FC = () => {
     const granted = await NotificationService.requestPermissions();
     if (granted) {
       await refreshNotifications();
-      Alert.alert('Notifications Enabled', 'All device reminder alarms are scheduled.');
+      showAlert({
+        type: 'dialog',
+        title: 'Notifications Enabled',
+        message: 'All device reminder alarms are active and scheduled.',
+        icon: 'success',
+        actions: [{ text: 'Done', style: 'primary' }],
+      });
     }
   };
 
@@ -210,7 +234,13 @@ export const SettingsScreen: React.FC = () => {
         message: csvData,
       });
     } catch (e) {
-      Alert.alert('Export Failed', 'Could not export CSV spreadsheet.');
+      showAlert({
+        type: 'dialog',
+        title: 'Export Failed',
+        message: 'Could not export CSV spreadsheet.',
+        icon: 'warning',
+        actions: [{ text: 'OK', style: 'default' }],
+      });
     }
   };
 
