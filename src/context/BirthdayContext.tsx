@@ -4,7 +4,7 @@ import { Birthday, CalculatedBirthday, UserSettings, ThemePreference } from '../
 import { cache } from '../services/cache';
 import { NotificationService } from '../services/notifications';
 import { SoundService } from '../services/sound';
-import { calculateBirthdayDetails, getInitialSeedBirthdays, sortBirthdaysUpcoming } from '../services/birthdays';
+import { calculateBirthdayDetails, sortBirthdaysUpcoming } from '../services/birthdays';
 import { SourcesService, SavedSource } from '../services/sources';
 import { PALETTES } from '../constants/theme';
 
@@ -71,16 +71,18 @@ export const BirthdayProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         await NotificationService.init();
 
         const [cachedBirthdays, cachedSettings, cachedSources, cachedCustomCats] = await Promise.all([
-          cache.hydrate<Birthday[]>(STORAGE_KEY_BIRTHDAYS, getInitialSeedBirthdays()),
+          cache.hydrate<Birthday[]>(STORAGE_KEY_BIRTHDAYS, []),
           cache.hydrate<UserSettings>(STORAGE_KEY_SETTINGS, DEFAULT_SETTINGS),
           SourcesService.getSavedSources(),
           cache.hydrate<string[]>(STORAGE_KEY_CUSTOM_CATEGORIES, []),
         ]);
 
+        const birthdaysList = Array.isArray(cachedBirthdays) ? cachedBirthdays : [];
+
         // Auto-discover any custom category present in stored contacts
         const standardCats = new Set(['student', 'family', 'friend', 'work', 'other']);
         const mergedCustomCatsSet = new Set(cachedCustomCats || []);
-        cachedBirthdays.forEach((b) => {
+        birthdaysList.forEach((b) => {
           if (b.relationship && !standardCats.has(b.relationship.toLowerCase().trim())) {
             mergedCustomCatsSet.add(b.relationship.trim());
           }
@@ -88,16 +90,16 @@ export const BirthdayProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         const mergedCustomCats = Array.from(mergedCustomCatsSet);
 
         if (isMounted) {
-          setBirthdays(cachedBirthdays);
+          setBirthdays(birthdaysList);
           setSettings(cachedSettings);
           setSavedSources(cachedSources);
           setCustomCategories(mergedCustomCats);
           setLoading(false);
         }
 
-        // Schedule system notifications for all birthdays across the database in background
+        // Schedule system notifications for all active birthdays in background
         NotificationService.scheduleAllBirthdayReminders(
-          cachedBirthdays,
+          birthdaysList,
           cachedSettings.defaultReminderTime || '06:00'
         ).catch(() => { });
       } catch (err) {

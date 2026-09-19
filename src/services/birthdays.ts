@@ -80,10 +80,3 @@ export function sortBirthdaysUpcoming(birthdays: Birthday[]): CalculatedBirthday
   const calculated = birthdays.map((b) => calculateBirthdayDetails(b));
   return calculated.sort((a, b) => a.daysUntil - b.daysUntil);
 }
-
-/**
- * Seed sample birthdays - clean initial state with no hardcoded demo contacts
- */
-export function getInitialSeedBirthdays(): Birthday[] {
-  return [];
-}
